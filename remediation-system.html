@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧補救教學系統 SRAS 2.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --pri:#4f46e5;--pril:#e0e7ff;--prid:#3730a3;
+  --ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+  --g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;
+  --g400:#9ca3af;--g600:#4b5563;--g700:#374151;--g900:#111827;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2ff;color:var(--g900);min-height:100vh;}
+
+/* Header */
+.hd{background:linear-gradient(135deg,var(--pri),var(--prid));color:#fff;padding:11px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:300;box-shadow:0 2px 12px rgba(79,70,229,.4);}
+.hd h1{font-size:1rem;font-weight:700;}
+.hd-right{display:flex;align-items:center;gap:7px;}
+.sync-pill{font-size:.68rem;padding:3px 9px;border-radius:12px;font-weight:600;
+  background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);cursor:pointer;transition:all .2s;}
+.api-badge{font-size:.67rem;padding:2px 7px;border-radius:10px;font-weight:600;}
+.api-on{background:rgba(16,185,129,.3);color:#6ee7b7;}
+.api-off{background:rgba(255,255,255,.1);color:rgba(255,255,255,.45);}
+
+/* Nav */
+.nav{background:#fff;display:flex;overflow-x:auto;border-bottom:2px solid var(--g200);
+  position:sticky;top:46px;z-index:200;padding:0 8px;}
+.nav::-webkit-scrollbar{height:0;}
+.nt{padding:10px 12px;cursor:pointer;font-size:.8rem;color:var(--g600);white-space:nowrap;
+  border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s;user-select:none;}
+.nt.active{color:var(--pri);border-bottom-color:var(--pri);font-weight:700;}
+.nt:hover:not(.active){color:var(--pri);background:var(--g50);}
+
+/* Main */
+.main{max-width:900px;margin:0 auto;padding:16px 12px 50px;}
+.sec{display:none;}
+.sec.active{display:block;animation:fi .2s;}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* Cards */
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 5px rgba(0,0,0,.08);}
+.ct{font-size:.93rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+
+/* Stat grid */
+.sg{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:12px;}
+@media(min-width:560px){.sg{grid-template-columns:repeat(4,1fr);}}
+.sc{background:#fff;border-radius:12px;padding:14px 12px;box-shadow:0 1px 5px rgba(0,0,0,.08);border-left:4px solid var(--pri);}
+.sc.g{border-left-color:var(--ok);}.sc.o{border-left-color:var(--warn);}.sc.r{border-left-color:var(--err);}
+.sv{font-size:1.7rem;font-weight:800;line-height:1.1;}
+.sl{font-size:.72rem;color:var(--g400);margin-top:4px;font-weight:500;}
+
+/* Chart */
+.cw{position:relative;height:210px;}
+.cw.tall{height:280px;}
+
+/* Quick actions */
+.qg{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
+@media(min-width:480px){.qg{grid-template-columns:repeat(4,1fr);}}
+.qc{background:var(--g50);border:1.5px solid var(--g200);border-radius:10px;padding:14px 8px;
+  text-align:center;cursor:pointer;transition:all .18s;}
+.qc:hover{border-color:var(--pri);background:var(--pril);transform:translateY(-2px);}
+.qi-icon{font-size:1.7rem;margin-bottom:5px;}
+.qi-lbl{font-size:.78rem;font-weight:600;color:var(--g700);}
+
+/* History table */
+.hist-table{width:100%;border-collapse:collapse;font-size:.82rem;}
+.hist-table th{background:var(--g50);padding:8px 10px;text-align:left;font-weight:700;
+  color:var(--g600);border-bottom:2px solid var(--g200);}
+.hist-table td{padding:8px 10px;border-bottom:1px solid var(--g100);vertical-align:middle;}
+.hist-table tr:hover td{background:var(--g50);}
+.hist-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+
+/* Forms */
+.fg{margin-bottom:10px;}
+.fl{display:block;font-size:.79rem;font-weight:600;color:var(--g700);margin-bottom:4px;}
+.fi,.fs,.fta{width:100%;padding:8px 10px;border:1.5px solid var(--g200);border-radius:8px;
+  font-size:.86rem;font-family:inherit;color:var(--g900);background:#fff;transition:border-color .18s;}
+.fi:focus,.fs:focus,.fta:focus{outline:none;border-color:var(--pri);}
+.fta{min-height:68px;resize:vertical;}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+@media(max-width:420px){.fr{grid-template-columns:1fr;}}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 15px;border-radius:8px;
+  font-size:.84rem;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:inherit;}
+.bp{background:var(--pri);color:#fff;}.bp:hover{background:var(--prid);}
+.bs{background:var(--ok);color:#fff;}.bs:hover{background:#059669;}
+.bo{background:#fff;color:var(--pri);border:1.5px solid var(--pri);}.bo:hover{background:var(--pril);}
+.bd{background:var(--err);color:#fff;}.bd:hover{background:#dc2626;}
+.bw{background:var(--warn);color:#fff;}.bw:hover{background:#d97706;}
+.bsm{padding:5px 10px;font-size:.76rem;}
+.bfull{width:100%;justify-content:center;}
+.br{display:flex;gap:7px;flex-wrap:wrap;}
+
+/* Badges */
+.bdg{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.69rem;font-weight:600;}
+.bb{background:var(--pril);color:var(--pri);}
+.bg{background:#d1fae5;color:#065f46;}
+.by{background:#fef3c7;color:#92400e;}
+.br2{background:#fee2e2;color:#991b1b;}
+.bgr{background:var(--g100);color:var(--g600);}
+
+/* Tags */
+.tr{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;
+  background:var(--pril);color:var(--pri);border-radius:20px;font-size:.71rem;font-weight:500;}
+.tx{cursor:pointer;opacity:.6;}.tx:hover{opacity:1;}
+.schips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.sch{padding:3px 8px;background:var(--g100);color:var(--g600);border-radius:20px;
+  font-size:.7rem;cursor:pointer;border:1px solid var(--g200);transition:all .15s;}
+.sch:hover{background:var(--pril);color:var(--pri);border-color:var(--pri);}
+
+/* Exam card */
+.ec{border:2px solid var(--g200);border-radius:10px;padding:11px 14px;cursor:pointer;
+  transition:all .18s;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;}
+.ec:hover,.ec.sel{border-color:var(--pri);background:var(--pril);}
+
+/* Upload area */
+.upa{border:2.5px dashed var(--g200);border-radius:12px;padding:22px 16px;text-align:center;transition:all .2s;}
+.upa:hover,.upa.drag{border-color:var(--pri);background:var(--pril);}
+.upa.has{border-style:solid;border-color:var(--ok);}
+#upPreview{max-width:100%;max-height:240px;border-radius:8px;margin-top:8px;}
+
+/* Camera buttons */
+.cam-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.cam-btn{flex:1;min-width:100px;padding:11px 8px;border-radius:10px;border:1.5px solid var(--g200);
+  background:#fff;cursor:pointer;text-align:center;transition:all .18s;font-family:inherit;}
+.cam-btn:hover{border-color:var(--pri);background:var(--pril);}
+.cam-btn .ci{font-size:1.5rem;display:block;margin-bottom:4px;}
+.cam-btn .cl{font-size:.78rem;font-weight:600;color:var(--g700);}
+
+/* ── Camera Modal ── */
+#camModal{display:none;position:fixed;inset:0;background:#000;z-index:1000;flex-direction:column;}
+#camModal.open{display:flex;}
+.cam-hd{background:#111;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.cam-hd span{color:#fff;font-weight:700;font-size:.95rem;}
+.cam-hd button{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;
+  padding:6px 12px;cursor:pointer;font-size:.85rem;}
+#camVideo{flex:1;object-fit:contain;background:#000;min-height:0;}
+#camCanvas{display:none;}
+.cam-ft{background:#111;padding:14px 16px;display:flex;justify-content:center;gap:12px;flex-shrink:0;}
+.cam-action{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:10px;
+  padding:10px 20px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;transition:all .2s;}
+.cam-action:hover{background:rgba(255,255,255,.25);}
+.cam-action.primary{background:var(--pri);color:#fff;}
+.cam-action.primary:hover{background:var(--prid);}
+.cam-preview-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;}
+#camCapturedImg{max-width:100%;max-height:100%;object-fit:contain;display:none;}
+.cam-switch{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.5);color:#fff;
+  border:none;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:1.1rem;}
+
+/* Answer grid */
+.ag{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px;}
+.ac{border:2px solid var(--g200);border-radius:8px;padding:7px;background:var(--g50);text-align:center;}
+.ac.ok{border-color:var(--ok);background:#f0fdf4;}
+.ac.ng{border-color:var(--err);background:#fff5f5;}
+
+/* MC bars */
+.mb{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+.ml{flex:0 0 150px;font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--g700);}
+.mt{flex:1;height:9px;background:var(--g100);border-radius:5px;overflow:hidden;}
+.mf{height:100%;border-radius:5px;transition:width .6s;}
+.mc{flex:0 0 34px;text-align:right;font-size:.78rem;font-weight:600;color:var(--g600);}
+
+/* Student rows */
+.sr{display:flex;align-items:center;justify-content:space-between;padding:8px 3px;border-bottom:1px solid var(--g100);}
+.sr:last-child{border-bottom:none;}
+
+/* Remediation */
+.rq{border-left:4px solid var(--pri);padding:11px 13px;margin-bottom:11px;background:var(--g50);border-radius:0 8px 8px 0;}
+.rq-t{font-weight:700;margin-bottom:5px;font-size:.86rem;}
+.rq-a{margin-top:5px;font-size:.81rem;color:#065f46;font-weight:700;}
+.rq-e{margin-top:4px;font-size:.81rem;color:var(--g700);line-height:1.6;}
+
+/* API block */
+.apib{border:1.5px solid var(--g200);border-radius:10px;padding:13px;margin-bottom:10px;}
+.apib-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--g200);display:inline-block;margin-left:5px;}
+.dot.ok{background:var(--ok);}.dot.err{background:var(--err);}
+.mchips{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;}
+.mc2{padding:3px 10px;border-radius:20px;font-size:.71rem;font-weight:600;cursor:pointer;
+  border:1.5px solid var(--g200);color:var(--g600);transition:all .15s;}
+.mc2.active{border-color:var(--pri);background:var(--pril);color:var(--pri);}
+.ptog{display:flex;gap:6px;margin-top:8px;}
+.pto{flex:1;padding:7px;text-align:center;border-radius:8px;border:1.5px solid var(--g200);
+  font-size:.79rem;font-weight:600;cursor:pointer;transition:all .15s;color:var(--g600);}
+.pto.active{border-color:var(--pri);background:var(--pril);color:var(--pri);}
+
+/* Report card */
+.rph{display:flex;align-items:center;gap:14px;padding:14px;
+  background:linear-gradient(135deg,#f0f4ff,#e0e7ff);border-radius:12px;margin-bottom:12px;}
+.scircle{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;font-weight:800;flex-shrink:0;position:relative;}
+.scircle svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);}
+.scircle .sv2{position:relative;z-index:1;font-size:1.1rem;font-weight:800;line-height:1;}
+.sh{background:#d1fae5;color:#065f46;}.sm{background:#fef3c7;color:#92400e;}.sl2{background:#fee2e2;color:#991b1b;}
+
+/* Alert */
+.al{padding:10px 12px;border-radius:8px;font-size:.83rem;margin-bottom:10px;line-height:1.55;}
+.ai{background:#e0f2fe;color:#0369a1;}.as{background:#d1fae5;color:#065f46;}
+.aw{background:#fef3c7;color:#92400e;}.ae{background:#fee2e2;color:#991b1b;}
+
+/* Loading */
+.ld{display:flex;align-items:center;gap:9px;padding:18px;justify-content:center;color:var(--pri);}
+.sp{width:17px;height:17px;border:2.5px solid var(--pril);border-top-color:var(--pri);
+  border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Empty state */
+.empty{text-align:center;padding:32px 16px;color:var(--g400);}
+.ei{font-size:2.5rem;margin-bottom:8px;}
+
+/* GAS block */
+.gas-block{border:1.5px solid var(--g200);border-radius:10px;padding:13px;margin-bottom:10px;}
+.gas-status{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;padding:3px 10px;
+  border-radius:20px;font-weight:600;}
+
+@media print{.hd,.nav,.btn,.fg,#camModal,#remCtrl{display:none!important;}
+  .card{box-shadow:none;border:1px solid #ddd;}.rq{break-inside:avoid;}}
+</style>
+</head>
+<body>
+
+<!-- ══ CAMERA MODAL ══ -->
+<div id="camModal">
+  <div class="cam-hd">
+    <span>📷 拍攝考卷</span>
+    <button onclick="closeCamera()">✕ 關閉</button>
+  </div>
+  <div class="cam-preview-wrap" id="camPreviewWrap">
+    <video id="camVideo" autoplay playsinline></video>
+    <img id="camCapturedImg" />
+    <button class="cam-switch" id="camSwitchBtn" onclick="switchCamera()" title="切換鏡頭">🔄</button>
+  </div>
+  <canvas id="camCanvas"></canvas>
+  <div class="cam-ft" id="camFt">
+    <button class="cam-action" onclick="closeCamera()">取消</button>
+    <button class="cam-action primary" id="camCaptureBtn" onclick="captureFrame()">📸 拍照</button>
+  </div>
+  <div class="cam-ft" id="camConfirmFt" style="display:none;">
+    <button class="cam-action" onclick="retakePhoto()">🔄 重拍</button>
+    <button class="cam-action primary" onclick="useCapture()">✅ 使用此照片</button>
+  </div>
+</div>
+
+<!-- ══ HEADER ══ -->
+<div class="hd">
+  <h1>🎯 智慧補救教學系統 <span style="font-size:.65rem;opacity:.7;margin-left:4px;">v2.0</span></h1>
+  <div class="hd-right">
+    <div class="sync-pill" id="syncPill" onclick="manualSync()" title="點擊手動同步">⭕ 未連線</div>
+    <div class="api-badge api-off" id="hdGemini">Gemini</div>
+    <div class="api-badge api-off" id="hdOpenai">GPT</div>
+  </div>
+</div>
+
+<!-- ══ NAV ══ -->
+<div class="nav">
+  <div class="nt active" onclick="showTab('dash')">🏠 首頁</div>
+  <div class="nt" onclick="showTab('exams')">📝 考卷管理</div>
+  <div class="nt" onclick="showTab('ind')">👤 個人分析</div>
+  <div class="nt" onclick="showTab('cls')">👥 班級分析</div>
+  <div class="nt" onclick="showTab('rem')">💡 補救題庫</div>
+  <div class="nt" onclick="showTab('settings')">⚙️ 設定</div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="main">
+
+  <!-- ─ 首頁 ─ -->
+  <div class="sec active" id="sec-dash">
+    <div class="sg" id="dashStats"></div>
+
+    <div class="card">
+      <div class="ct">🧠 迷思概念熱點</div>
+      <div id="dashMCArea"><div class="empty"><div class="ei">📊</div><div>尚無分析資料</div></div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;" id="dashRow2">
+      <div class="card">
+        <div class="ct">📈 成績分佈</div>
+        <div id="dashScoreArea"><div class="empty" style="padding:12px;"><div style="font-size:1.4rem;">📋</div><div>尚無資料</div></div></div>
+      </div>
+      <div class="card">
+        <div class="ct">⏱ 最近記錄</div>
+        <div id="dashRecent"></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="card">
+        <div class="ct">📅 成績趨勢</div>
+        <div id="dashTrendArea"><div class="empty" style="padding:14px;"><div style="font-size:1.4rem;">📈</div><div>尚無資料</div></div></div>
+      </div>
+      <div class="card">
+        <div class="ct">🥧 科目分佈</div>
+        <div id="dashSubjArea"><div class="empty" style="padding:14px;"><div style="font-size:1.4rem;">📚</div><div>尚無資料</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">📚 歷史記錄</div>
+      <div class="hist-filters">
+        <select class="fs" style="width:auto;padding:5px 9px;font-size:.79rem;" id="histExamFilter" onchange="renderHistory()">
+          <option value="">全部考卷</option>
+        </select>
+        <input type="text" class="fi" style="width:140px;padding:5px 9px;font-size:.79rem;" id="histSearch" placeholder="搜尋學生姓名…" oninput="renderHistory()" />
+        <select class="fs" style="width:auto;padding:5px 9px;font-size:.79rem;" id="histScoreFilter" onchange="renderHistory()">
+          <option value="">全部成績</option>
+          <option value="high">優秀 90+</option>
+          <option value="good">良好 75-89</option>
+          <option value="pass">及格 60-74</option>
+          <option value="fail">不及格 &lt;60</option>
+        </select>
+        <button class="btn bo bsm" onclick="exportCSV()">📥 匯出CSV</button>
+      </div>
+      <div id="histTable" style="overflow-x:auto;"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">⚡ 快速操作</div>
+      <div class="qg">
+        <div class="qc" onclick="showTab('ind')"><div class="qi-icon">📷</div><div class="qi-lbl">批改學生考卷</div></div>
+        <div class="qc" onclick="showTab('cls')"><div class="qi-icon">📊</div><div class="qi-lbl">查看班級分析</div></div>
+        <div class="qc" onclick="showTab('rem')"><div class="qi-icon">💡</div><div class="qi-lbl">生成補救題目</div></div>
+        <div class="qc" onclick="showTab('exams')"><div class="qi-icon">📝</div><div class="qi-lbl">管理考卷設定</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ 考卷管理 ─ -->
+  <div class="sec" id="sec-exams">
+    <div class="card">
+      <div class="ct">📝 建立新考卷</div>
+      <div class="fr">
+        <div class="fg"><label class="fl">考卷名稱</label><input type="text" id="examName" class="fi" placeholder="例：第一次段考" /></div>
+        <div class="fg"><label class="fl">年級</label>
+          <select id="examGrade" class="fs"><option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option>五年級</option>
+            <option>六年級</option><option>七年級</option><option>八年級</option><option>九年級</option></select></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label class="fl">科目</label>
+          <select id="examSubject" class="fs"><option value="math">數學</option><option value="english">英文</option>
+            <option value="chinese">國語</option><option value="science">自然/理化</option><option value="social">社會</option></select></div>
+        <div class="fg"><label class="fl">題目總數</label><input type="number" id="examTotal" class="fi" value="20" min="1" max="60" /></div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">👥 班級名單（選填，可空白）</label>
+        <div class="al ai" style="font-size:.76rem;margin-bottom:7px;">輸入座號與姓名後批改時可直接選取，兩欄皆可空白。</div>
+        <div id="rosterTable" style="border:1.5px solid var(--g200);border-radius:8px;overflow:hidden;margin-bottom:6px;">
+          <div style="display:grid;grid-template-columns:70px 1fr 36px;background:var(--g50);padding:5px 10px;font-size:.75rem;font-weight:700;color:var(--g600);border-bottom:1px solid var(--g200);">
+            <span>座號</span><span>姓名</span><span></span>
+          </div>
+          <div id="rosterRows"></div>
+        </div>
+        <button class="btn bo bsm" onclick="addRosterRow()">＋ 新增學生</button>
+        <button class="btn bsm" style="background:var(--g100);color:var(--g700);margin-left:5px;" onclick="batchRoster()">📋 批次輸入</button>
+      </div>
+
+      <button class="btn bp" onclick="createExam()">➕ 建立考卷</button>
+    </div>
+
+    <div id="qBuilder" style="display:none;">
+      <div class="card">
+        <div class="ct">📋 題目設定 — <span id="qbName" style="color:var(--pri);"></span>
+          <span id="qbBadge" class="bdg bb" style="margin-left:4px;"></span></div>
+        <div class="al ai" style="font-size:.79rem;">💡 為每題填入<strong>正確答案</strong>並標記<strong>迷思概念</strong>（答錯時對應哪個概念）</div>
+        <div id="qList"></div>
+        <div class="br" style="margin-top:9px;">
+          <button class="btn bo bsm" onclick="addQ()">➕ 新增題目</button>
+          <button class="btn bp bsm" onclick="alert('✅ 已自動儲存')">✅ 已儲存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">📁 已建立的考卷</div>
+      <div id="examList"></div>
+    </div>
+  </div>
+
+  <!-- ─ 個人分析 ─ -->
+  <div class="sec" id="sec-ind">
+    <div class="card">
+      <div class="ct">📋 選擇考卷</div>
+      <div id="indExamSel"></div>
+    </div>
+
+    <div id="indPanel" style="display:none;">
+      <div class="card">
+        <div class="ct">👤 學生資料</div>
+        <div id="rosterPicker" style="display:none;margin-bottom:9px;">
+          <label class="fl">從名單選取</label>
+          <select id="rosterSel" class="fs" onchange="pickRoster(this.value)">
+            <option value="">── 手動輸入 ──</option>
+          </select>
+        </div>
+        <div class="fr">
+          <div class="fg"><label class="fl">學生姓名</label><input type="text" id="sName" class="fi" placeholder="王小明" /></div>
+          <div class="fg"><label class="fl">座號（選填）</label><input type="text" id="sSeat" class="fi" placeholder="01" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ct">📷 考卷輸入</div>
+        <div class="upa" id="upa" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+          onclick="document.getElementById('galInput').click()">
+          <div id="upPH">
+            <div style="font-size:2rem;">🖼️</div>
+            <div style="margin-top:6px;font-weight:600;font-size:.87rem;">點擊選取圖片，或從下方按鈕輸入</div>
+            <div style="font-size:.72rem;color:var(--g400);margin-top:2px;">支援 JPG · PNG</div>
+          </div>
+          <img id="upPreview" style="display:none;" />
+        </div>
+        <!-- Hidden file inputs -->
+        <input type="file" id="galInput" accept="image/*" style="display:none;" onchange="handleFile(event)" />
+        <input type="file" id="camInput" accept="image/*" capture="environment" style="display:none;" onchange="handleFile(event)" />
+
+        <!-- Photo input buttons -->
+        <div class="cam-btns">
+          <button class="cam-btn" onclick="openWebcam()">
+            <span class="ci">📷</span><span class="cl">相機拍照</span>
+          </button>
+          <button class="cam-btn" onclick="document.getElementById('camInput').click()">
+            <span class="ci">📱</span><span class="cl">手機拍照</span>
+          </button>
+          <button class="cam-btn" onclick="document.getElementById('galInput').click()">
+            <span class="ci">🖼️</span><span class="cl">從相簿選取</span>
+          </button>
+          <button class="cam-btn" onclick="clearPhoto()">
+            <span class="ci">🗑️</span><span class="cl">清除</span>
+          </button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <button class="btn bp bfull" onclick="analyzePhoto()">🤖 AI 辨識答案</button>
+        </div>
+        <div id="analyzeStatus" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="card" id="ansReview" style="display:none;">
+        <div class="ct">✏️ 確認答案（可手動修正）</div>
+        <div class="al aw" style="font-size:.79rem;">請核對 AI 辨識結果，綠框=正確，紅框=有誤，可直接修改。</div>
+        <div id="ansGrid" class="ag"></div>
+        <div class="br" style="margin-top:10px;">
+          <button class="btn bs" onclick="gradeAndSave()">✅ 儲存成績</button>
+          <button class="btn bo" onclick="document.getElementById('ansReview').style.display='none'">取消</button>
+        </div>
+      </div>
+
+      <div id="indReport"></div>
+    </div>
+  </div>
+
+  <!-- ─ 班級分析 ─ -->
+  <div class="sec" id="sec-cls">
+    <div class="card">
+      <div class="ct">📊 選擇考卷</div>
+      <div id="clsExamSel"></div>
+    </div>
+    <div id="clsPanel"></div>
+  </div>
+
+  <!-- ─ 補救題庫 ─ -->
+  <div class="sec" id="sec-rem">
+    <div class="card" id="remCtrl">
+      <div class="ct">💡 AI 補救題目生成</div>
+      <div class="fr">
+        <div class="fg"><label class="fl">科目</label>
+          <select id="remSubj" class="fs" onchange="updateRemS()"><option value="math">數學</option>
+            <option value="english">英文</option><option value="chinese">國語</option>
+            <option value="science">自然/理化</option><option value="social">社會</option></select></div>
+        <div class="fg"><label class="fl">年級</label>
+          <select id="remGrade" class="fs"><option>一年級</option><option>二年級</option><option>三年級</option><option>四年級</option><option>五年級</option>
+            <option>六年級</option><option>七年級</option><option>八年級</option><option>九年級</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">迷思概念</label>
+        <input type="text" id="remMC" class="fi" placeholder="例：分數加減通分概念錯誤" />
+        <div class="schips" id="remSugg"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label class="fl">題數</label>
+          <select id="remCnt" class="fs"><option value="3">3 題</option><option value="5" selected>5 題</option><option value="8">8 題</option></select></div>
+        <div class="fg"><label class="fl">題型</label>
+          <select id="remType" class="fs"><option value="mixed">混合</option><option value="choice">全選擇題</option><option value="fill">全填充/簡答</option></select></div>
+      </div>
+      <div class="fg"><label class="fl">補充說明（選填）</label>
+        <textarea id="remExtra" class="fta" placeholder="例：難度稍低、加入解題步驟…"></textarea></div>
+      <button class="btn bp bfull" onclick="genRem()">🤖 生成補救題目</button>
+    </div>
+    <div id="remResult"></div>
+  </div>
+
+  <!-- ─ 設定 ─ -->
+  <div class="sec" id="sec-settings">
+    <div class="card">
+      <div class="ct">⚙️ AI 多模態設定</div>
+      <div class="al ai" style="font-size:.79rem;">支援 Gemini 與 OpenAI，可同時設定，自動切換備援。</div>
+      <div style="font-weight:700;font-size:.83rem;margin-bottom:7px;color:var(--g700);">優先使用</div>
+      <div class="ptog">
+        <div class="pto" id="ptG" onclick="setPri('gemini')">🟦 Gemini 優先</div>
+        <div class="pto" id="ptO" onclick="setPri('openai')">🟩 OpenAI 優先</div>
+        <div class="pto" id="ptA" onclick="setPri('auto')">🔄 自動</div>
+      </div>
+    </div>
+
+    <div class="apib">
+      <div class="apib-hd">
+        <div style="font-weight:700;font-size:.88rem;">🟦 Google Gemini <span class="dot" id="gDot"></span>
+          <span id="gTxt" style="font-size:.7rem;color:var(--g400);font-weight:400;margin-left:3px;"></span></div>
+        <button class="btn bo bsm" onclick="testApi('gemini')">測試</button>
+      </div>
+      <div class="fg" style="margin-bottom:6px;"><label class="fl">API Key</label>
+        <div style="position:relative;"><input type="password" id="gemKey" class="fi" placeholder="AIzaSy…" style="padding-right:40px;"/>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;" onclick="tv('gemKey')">👁</span></div></div>
+      <div class="mchips" id="gModels">
+        <div class="mc2" data-m="gemini-1.5-flash" onclick="setM('gemini','gemini-1.5-flash')">1.5 Flash ⚡</div>
+        <div class="mc2" data-m="gemini-2.0-flash-exp" onclick="setM('gemini','gemini-2.0-flash-exp')">2.0 Flash 🆕</div>
+        <div class="mc2" data-m="gemini-1.5-pro" onclick="setM('gemini','gemini-1.5-pro')">1.5 Pro 🎯</div>
+      </div>
+      <div style="font-size:.69rem;color:var(--g400);margin-top:5px;">免費申請：<a href="https://ai.google.dev" target="_blank" style="color:var(--pri);">ai.google.dev</a></div>
+    </div>
+
+    <div class="apib">
+      <div class="apib-hd">
+        <div style="font-weight:700;font-size:.88rem;">🟩 OpenAI GPT-4o <span class="dot" id="oDot"></span>
+          <span id="oTxt" style="font-size:.7rem;color:var(--g400);font-weight:400;margin-left:3px;"></span></div>
+        <button class="btn bo bsm" onclick="testApi('openai')">測試</button>
+      </div>
+      <div class="fg" style="margin-bottom:6px;"><label class="fl">API Key</label>
+        <div style="position:relative;"><input type="password" id="oaiKey" class="fi" placeholder="sk-…" style="padding-right:40px;"/>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;" onclick="tv('oaiKey')">👁</span></div></div>
+      <div class="mchips" id="oModels">
+        <div class="mc2" data-m="gpt-4o-mini" onclick="setM('openai','gpt-4o-mini')">GPT-4o mini ⚡</div>
+        <div class="mc2" data-m="gpt-4o" onclick="setM('openai','gpt-4o')">GPT-4o 🎯</div>
+      </div>
+      <div style="font-size:.69rem;color:var(--g400);margin-top:5px;">申請：<a href="https://platform.openai.com" target="_blank" style="color:var(--pri);">platform.openai.com</a></div>
+    </div>
+
+    <!-- GAS Backend -->
+    <div class="gas-block">
+      <div style="font-weight:700;font-size:.88rem;margin-bottom:10px;">
+        ☁️ Google 試算表雲端後台
+        <span class="gas-status" id="gasStatusBadge" style="margin-left:8px;">⭕ 未設定</span>
+      </div>
+      <div class="al ai" style="font-size:.78rem;margin-bottom:10px;">
+        連結 Google Apps Script，可將所有批改記錄儲存到 Google 試算表，支援多裝置同步。
+        <strong>Code.gs 下載後貼入 Apps Script，部署為網頁應用程式即可。</strong>
+      </div>
+      <div class="fg"><label class="fl">Google Apps Script 網址</label>
+        <input type="text" id="gasUrl" class="fi" placeholder="https://script.google.com/macros/s/…/exec" /></div>
+      <div class="br">
+        <button class="btn bo bsm" onclick="testGAS()">🔌 測試連線</button>
+        <button class="btn bp bsm" onclick="syncNow()">🔄 立即同步</button>
+        <button class="btn bsm" style="background:var(--g100);color:var(--g700);" onclick="pullFromGAS()">⬇️ 從雲端讀取</button>
+      </div>
+      <div id="gasMsg" style="margin-top:8px;"></div>
+    </div>
+
+    <button class="btn bp bfull" onclick="saveSettings()">💾 儲存所有設定</button>
+    <div id="settingsMsg" style="margin-top:8px;"></div>
+  </div>
+
+</div>
+
+<script>
+// ══════ DB ══════
+const DB={
+  get:(k,d=null)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},
+  set:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),
+};
+
+// ══════ MISCONCEPTIONS ══════
+const MCL={
+  math:['四則運算順序錯誤','分數加減通分概念','小數點位置混淆','比例與比值混淆','幾何面積公式混淆','文字題理解','負數大小概念','因數倍數混淆','方程式移項錯誤','百分率換算'],
+  english:['時態判斷錯誤','主謂一致性','介系詞混淆','可數不可數','冠詞使用錯誤','閱讀推論','拼字錯誤','疑問句語序','連接詞使用','比較級形式'],
+  chinese:['字義理解錯誤','注音符號混淆','成語誤用','閱讀推論','修辭手法辨識','文章主旨','標點使用','字形混淆','語詞造句','語段銜接'],
+  science:['力與運動混淆','能量守恆','物質變化','生物分類','電路串並聯','光折射反射','酸鹼中和','生態系統','密度浮力','天體運動'],
+  social:['歷史時間序列','地圖判讀','法律概念','地理氣候','台灣地形','政府三權','基本人權','文化習俗','國際關係','環境永續'],
+};
+
+// ══════ STATE ══════
+const SL={math:'數學',english:'英文',chinese:'國語',science:'自然/理化',social:'社會'};
+const sl=s=>SL[s]||s;
+let currExam=null,indExam=null,clsExam=null;
+let photob64=null,extAns={},capturedB64=null;
+let dashC={};
+let camStream=null,camFacing='environment';
+
+// ══════ AI LAYER ══════
+const AI={
+  providers(){
+    const gk=DB.get('gemKey',''),ok=DB.get('oaiKey',''),pri=DB.get('priAPI','auto');
+    const gm=DB.get('gModel','gemini-1.5-flash'),om=DB.get('oModel','gpt-4o-mini');
+    const gemini={id:'gemini',name:'Gemini',
+      async call(p,img){
+        const parts=[{text:p}]; if(img)parts.push({inline_data:{mime_type:'image/jpeg',data:img}});
+        const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${gk}`,
+          {method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:img?.0:.7,maxOutputTokens:4096}})});
+        const d=await r.json(); if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
+        return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      }};
+    const openai={id:'openai',name:'OpenAI',
+      async call(p,img){
+        const c=img?[{type:'text',text:p},{type:'image_url',image_url:{url:`data:image/jpeg;base64,${img}`}}]:[{type:'text',text:p}];
+        const r=await fetch('https://api.openai.com/v1/chat/completions',
+          {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${ok}`},
+           body:JSON.stringify({model:om,messages:[{role:'user',content:c}],max_tokens:4096})});
+        const d=await r.json(); if(!r.ok)throw new Error(d.error?.message||`OpenAI ${r.status}`);
+        return d.choices?.[0]?.message?.content||'';
+      }};
+    const arr=[];
+    if(pri==='gemini'){if(gk)arr.push(gemini);if(ok)arr.push(openai);}
+    else if(pri==='openai'){if(ok)arr.push(openai);if(gk)arr.push(gemini);}
+    else{if(gk)arr.push(gemini);if(ok)arr.push(openai);}
+    return arr;
+  },
+  lastUsed:'',
+  async call(p,img=null){
+    const ps=this.providers();
+    if(!ps.length)throw new Error('請先在「設定」輸入 Gemini 或 OpenAI API Key');
+    let last;
+    for(const pv of ps){try{const r=await pv.call(p,img);this.lastUsed=pv.name;return r;}catch(e){last=e;}}
+    throw last;
+  }
+};
+
+// ══════ GAS BACKEND ══════
+async function gasPost(data){
+  const url=DB.get('gasUrl',''); if(!url)return null;
+  const r=await fetch(url,{method:'POST',body:JSON.stringify(data)});
+  return await r.json();
+}
+async function gasGet(params=''){
+  const url=DB.get('gasUrl',''); if(!url)return null;
+  const r=await fetch(url+'?'+params); return await r.json();
+}
+function setSyncStatus(s){
+  const el=document.getElementById('syncPill'); if(!el)return;
+  const map={synced:{t:'✅ 已同步',c:'rgba(16,185,129,.3)'},syncing:{t:'🔄 同步中',c:'rgba(245,158,11,.3)'},
+    error:{t:'⚠️ 同步失敗',c:'rgba(239,68,68,.3)'},offline:{t:'📴 離線模式',c:'rgba(255,255,255,.1)'},none:{t:'⭕ 未設定後台',c:'rgba(255,255,255,.1)'}};
+  const cfg=map[s]||map.none;
+  el.textContent=cfg.t; el.style.background=cfg.c;
+  const badgeEl=document.getElementById('gasStatusBadge');
+  if(badgeEl){const cfg2={synced:{t:'✅ 已連線',c:'#d1fae5;color:#065f46'},error:{t:'❌ 連線失敗',c:'#fee2e2;color:#991b1b'},none:{t:'⭕ 未設定',c:'var(--g100);color:var(--g600)'}};const b=cfg2[s]||cfg2.none;badgeEl.innerHTML=b.t;badgeEl.style.cssText=`background:${b.c};`;}
+}
+async function syncToGAS(sub){
+  try{await gasPost({action:'saveSubmission',submission:sub});setSyncStatus('synced');}
+  catch{setSyncStatus('error');}
+}
+async function pullFromGAS(){
+  const url=DB.get('gasUrl',''); if(!url){alert('請先設定 GAS 網址');return;}
+  setSyncStatus('syncing');
+  try{
+    const d=await gasGet('action=all');
+    if(d?.submissions?.length){
+      const local=DB.get('submissions',[]); const m={};
+      [...local,...d.submissions].forEach(s=>{m[s.id]=s;});
+      DB.set('submissions',Object.values(m));
+    }
+    if(d?.exams?.length){
+      const local=DB.get('exams',[]); const m={};
+      [...local,...d.exams].forEach(e=>{m[e.id]=e;});
+      DB.set('exams',Object.values(m));
+    }
+    setSyncStatus('synced');
+    alert(`✅ 同步完成！載入 ${d?.submissions?.length||0} 筆記錄`);
+    renderDashboard();
+  }catch(e){setSyncStatus('error');alert('同步失敗：'+e.message);}
+}
+async function syncNow(){
+  const url=DB.get('gasUrl',''); if(!url){alert('請先設定 GAS 網址');return;}
+  setSyncStatus('syncing');
+  try{
+    const subs=DB.get('submissions',[]);
+    const exams=DB.get('exams',[]);
+    const r=await gasPost({action:'syncAll',submissions:subs,exams:exams});
+    setSyncStatus('synced');
+    alert(`✅ 同步完成！已上傳 ${subs.length} 筆記錄`);
+  }catch(e){setSyncStatus('error');alert('同步失敗：'+e.message);}
+}
+async function testGAS(){
+  const url=document.getElementById('gasUrl').value.trim();
+  if(!url){showMsg('gasMsg','請先輸入 GAS 網址','ae');return;}
+  showMsg('gasMsg',(()=>ld('測試連線中…'))(),'');
+  try{
+    const r=await fetch(url+'?action=ping'); const d=await r.json();
+    showMsg('gasMsg',d.ok?'✅ 連線成功！後台運作正常':'⚠️ 連線成功但回應異常',d.ok?'as':'aw');
+  }catch(e){showMsg('gasMsg','❌ 連線失敗：'+e.message,'ae');}
+}
+async function manualSync(){
+  const url=DB.get('gasUrl',''); if(!url){showTab('settings');return;}
+  await pullFromGAS();
+}
+
+// ══════ TABS ══════
+const TABS=['dash','exams','ind','cls','rem','settings'];
+function showTab(t){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach((n,i)=>n.classList.toggle('active',TABS[i]===t));
+  document.getElementById('sec-'+t).classList.add('active');
+  if(t==='dash')renderDashboard();
+  if(t==='exams')renderExamList();
+  if(t==='ind')renderIndSel();
+  if(t==='cls')renderClsSel();
+  if(t==='rem')updateRemS();
+  if(t==='settings')loadSettings();
+}
+
+// ══════ DASHBOARD ══════
+function renderDashboard(){
+  const exams=DB.get('exams',[]),subs=DB.get('submissions',[]);
+  const scores=subs.map(s=>s.percentage);
+  const avg=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
+  const allMC={};
+  subs.forEach(s=>s.misconceptions?.forEach(m=>{allMC[m]=(allMC[m]||0)+1;}));
+  const topMC=Object.entries(allMC).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  document.getElementById('dashStats').innerHTML=`
+    ${sCard(exams.length,'📝','考卷數','')}
+    ${sCard(subs.length,'📊','批改人次','g')}
+    ${sCard(scores.length?avg+'分':'—','🏆','平均分','o')}
+    ${sCard(topMC[0]?.[0]||'無資料','🧠','最常見迷思','r')}`;
+
+  Object.values(dashC).forEach(c=>{try{c.destroy();}catch{}});dashC={};
+
+  const mcArea=document.getElementById('dashMCArea');
+  if(!topMC.length){mcArea.innerHTML='<div class="empty"><div class="ei">📊</div><div>尚無分析資料</div></div>';}
+  else{
+    mcArea.innerHTML='<div class="cw tall"><canvas id="cMC"></canvas></div>';
+    dashC.mc=new Chart(document.getElementById('cMC'),{type:'bar',
+      data:{labels:topMC.map(([m])=>m.length>14?m.slice(0,14)+'…':m),
+        datasets:[{data:topMC.map(([,v])=>v),backgroundColor:'rgba(79,70,229,.75)',borderRadius:5,borderSkipped:false}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{x:{ticks:{stepSize:1},grid:{color:'#f3f4f6'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});
+  }
+
+  const scoreArea=document.getElementById('dashScoreArea');
+  if(!scores.length){scoreArea.innerHTML='<div class="empty" style="padding:12px;"><div style="font-size:1.5rem;">📋</div><div>尚無資料</div></div>';}
+  else{
+    const bands=[0,0,0,0];
+    scores.forEach(s=>{if(s<60)bands[0]++;else if(s<75)bands[1]++;else if(s<90)bands[2]++;else bands[3]++;});
+    scoreArea.innerHTML='<div class="cw"><canvas id="cScore"></canvas></div>';
+    dashC.score=new Chart(document.getElementById('cScore'),{type:'doughnut',
+      data:{labels:['待加強','及格','良好','優秀'],
+        datasets:[{data:bands,backgroundColor:['#fca5a5','#fde68a','#6ee7b7','#818cf8'],borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:6}}}}});
+  }
+
+  const recent=subs.slice(-5).reverse();
+  document.getElementById('dashRecent').innerHTML=!recent.length
+    ?'<div class="empty" style="padding:14px;"><div style="font-size:1.5rem;">📋</div><div>尚無記錄</div></div>'
+    :recent.map(s=>{
+      const e=DB.get('exams',[]).find(x=>x.id===s.examId);
+      const sc=s.percentage>=80?'#d1fae5':s.percentage>=60?'#fef3c7':'#fee2e2';
+      return `<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--g100);">
+        <div style="width:32px;height:32px;border-radius:50%;background:${sc};display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;">${s.percentage>=80?'🌟':s.percentage>=60?'📗':'📕'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.studentName)}</div>
+          <div style="font-size:.71rem;color:var(--g400);">${e?esc(e.name):'—'} · ${s.gradedAt}</div>
+        </div>
+        <div style="font-weight:700;font-size:.9rem;color:${s.percentage>=80?'#065f46':s.percentage>=60?'#92400e':'#991b1b'};flex-shrink:0;">${s.percentage}分</div>
+      </div>`;
+    }).join('');
+
+  // ── Trend line chart ──
+  const trendArea=document.getElementById('dashTrendArea');
+  const byDate={};
+  subs.forEach(s=>{const d=s.gradedAt||'?';if(!byDate[d])byDate[d]=[];byDate[d].push(s.percentage);});
+  const dateKeys=Object.keys(byDate).sort((a,b)=>new Date(a)-new Date(b)).slice(-14);
+  if(dateKeys.length<2){trendArea.innerHTML='<div class="empty" style="padding:14px;"><div style="font-size:1.4rem;">📈</div><div>需2天以上資料</div></div>';}
+  else{
+    trendArea.innerHTML='<div class="cw"><canvas id="cTrend"></canvas></div>';
+    const avgs=dateKeys.map(d=>Math.round(byDate[d].reduce((a,b)=>a+b,0)/byDate[d].length));
+    dashC.trend=new Chart(document.getElementById('cTrend'),{type:'line',
+      data:{labels:dateKeys.map(d=>d.slice(5)||d),
+        datasets:[{data:avgs,borderColor:'#4f46e5',backgroundColor:'rgba(79,70,229,.1)',
+          borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#4f46e5',fill:true,tension:.35}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`平均 ${c.parsed.y} 分`}}},
+        scales:{y:{min:0,max:100,ticks:{stepSize:20},grid:{color:'#f3f4f6'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+  }
+
+  // ── Subject distribution pie ──
+  const subjArea=document.getElementById('dashSubjArea');
+  const subjMap={};
+  subs.forEach(s=>{const e=exams.find(x=>x.id===s.examId);const sk=e?.subject||'other';subjMap[sk]=(subjMap[sk]||0)+1;});
+  const subjEntries=Object.entries(subjMap);
+  const subjColors=['#818cf8','#34d399','#f59e0b','#f87171','#60a5fa','#a78bfa'];
+  const subjLabels={math:'數學',english:'英文',chinese:'國語',science:'自然',social:'社會',other:'其他'};
+  if(!subjEntries.length){subjArea.innerHTML='<div class="empty" style="padding:14px;"><div style="font-size:1.4rem;">📚</div><div>尚無資料</div></div>';}
+  else{
+    subjArea.innerHTML='<div class="cw"><canvas id="cSubj"></canvas></div>';
+    dashC.subj=new Chart(document.getElementById('cSubj'),{type:'doughnut',
+      data:{labels:subjEntries.map(([k])=>subjLabels[k]||k),
+        datasets:[{data:subjEntries.map(([,v])=>v),backgroundColor:subjColors,borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        cutout:'55%',
+        plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:6}},
+          tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed} 人次`}}}}});
+  }
+
+  renderHistory();
+  updateHdBadges();
+}
+
+function sCard(v,icon,lbl,cls){
+  return `<div class="sc ${cls}"><div class="sv">${esc(String(v))}</div><div class="sl">${icon} ${lbl}</div></div>`;
+}
+
+function renderHistory(){
+  const subs=DB.get('submissions',[]);
+  const exams=DB.get('exams',[]);
+
+  // Build exam filter options
+  const hef=document.getElementById('histExamFilter');
+  if(hef){
+    const cur=hef.value;
+    hef.innerHTML='<option value="">全部考卷</option>'+exams.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+    hef.value=cur;
+  }
+
+  const examF=document.getElementById('histExamFilter')?.value||'';
+  const search=(document.getElementById('histSearch')?.value||'').toLowerCase();
+  const scoreF=document.getElementById('histScoreFilter')?.value||'';
+
+  let filtered=subs.filter(s=>{
+    if(examF&&s.examId!==examF)return false;
+    if(search&&!s.studentName.toLowerCase().includes(search))return false;
+    if(scoreF==='high'&&s.percentage<90)return false;
+    if(scoreF==='good'&&(s.percentage<75||s.percentage>=90))return false;
+    if(scoreF==='pass'&&(s.percentage<60||s.percentage>=75))return false;
+    if(scoreF==='fail'&&s.percentage>=60)return false;
+    return true;
+  }).sort((a,b)=>new Date(b.gradedAt)-new Date(a.gradedAt));
+
+  const ht=document.getElementById('histTable');
+  if(!filtered.length){ht.innerHTML='<div class="empty" style="padding:18px;"><div>📭 無符合記錄</div></div>';return;}
+
+  ht.innerHTML=`<table class="hist-table">
+    <thead><tr><th>姓名</th><th>座號</th><th>考卷</th><th>得分</th><th>迷思概念</th><th>批改日期</th><th></th></tr></thead>
+    <tbody>${filtered.map(s=>{
+      const e=exams.find(x=>x.id===s.examId);
+      const sc=s.percentage>=80?'bg':s.percentage>=60?'by':'br2';
+      return `<tr>
+        <td style="font-weight:600;">${esc(s.studentName)}</td>
+        <td>${esc(s.seatNo||'—')}</td>
+        <td>${e?esc(e.name):'—'}</td>
+        <td><span class="bdg ${sc}">${s.percentage}分</span></td>
+        <td>${s.misconceptions?.length?s.misconceptions.slice(0,2).map(m=>`<span class="bdg br2" style="font-size:.66rem;">${esc(m)}</span>`).join(' ')+'(共'+s.misconceptions.length+'項)':'<span class="bdg bg" style="font-size:.66rem;">無</span>'}</td>
+        <td style="font-size:.78rem;color:var(--g400);">${s.gradedAt}</td>
+        <td><button class="btn bd bsm" onclick="delSub('${s.id}')">🗑</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>
+  <div style="margin-top:6px;font-size:.75rem;color:var(--g400);">共 ${filtered.length} 筆記錄</div>`;
+}
+
+function delSub(id){
+  if(!confirm('確定刪除此筆記錄？'))return;
+  DB.set('submissions',DB.get('submissions',[]).filter(s=>s.id!==id));
+  renderDashboard();
+}
+
+function exportCSV(){
+  const subs=DB.get('submissions',[]);
+  const exams=DB.get('exams',[]);
+  if(!subs.length){alert('無資料可匯出');return;}
+  const rows=[['姓名','座號','考卷','科目','年級','分數','百分比','迷思概念','批改日期']];
+  subs.forEach(s=>{
+    const e=exams.find(x=>x.id===s.examId);
+    rows.push([s.studentName,s.seatNo||'',e?.name||'',sl(e?.subject||''),e?.grade||'',s.score,s.percentage,(s.misconceptions||[]).join('|'),s.gradedAt]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='補救教學記錄_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ══════ ROSTER ══════
+let rosterData=[];
+function addRosterRow(seat='',name=''){
+  rosterData.push({seat,name});renderRosterTable();
+}
+function renderRosterTable(){
+  document.getElementById('rosterRows').innerHTML=rosterData.map((r,i)=>`
+    <div style="display:grid;grid-template-columns:70px 1fr 36px;padding:5px 10px;border-bottom:1px solid var(--g100);gap:5px;align-items:center;">
+      <input type="text" class="fi" value="${esc(r.seat)}" placeholder="01" style="padding:4px 6px;font-size:.82rem;"
+        oninput="rosterData[${i}].seat=this.value" />
+      <input type="text" class="fi" value="${esc(r.name)}" placeholder="（空白）" style="padding:4px 6px;font-size:.82rem;"
+        oninput="rosterData[${i}].name=this.value" />
+      <button style="background:none;border:none;cursor:pointer;color:var(--err);font-size:1rem;" onclick="rosterData.splice(${i},1);renderRosterTable()">✕</button>
+    </div>`).join('');
+}
+function batchRoster(){
+  const raw=prompt('批次輸入格式：每行「座號 姓名」或「姓名」\n例：\n01 王小明\n02 李小花\n（座號可省略）');
+  if(!raw)return;
+  raw.trim().split('\n').forEach(line=>{
+    const p=line.trim().split(/\s+/);
+    if(!p.length||!p[0])return;
+    const hasSeat=/^\d+$/.test(p[0]);
+    rosterData.push({seat:hasSeat?p[0]:'',name:hasSeat?p.slice(1).join(' '):p.join(' ')});
+  });
+  renderRosterTable();
+}
+function pickRoster(v){
+  if(!v)return;
+  const [seat,name]=v.split('||');
+  document.getElementById('sSeat').value=seat;
+  document.getElementById('sName').value=name;
+}
+
+// ══════ EXAM MANAGEMENT ══════
+function createExam(){
+  const name=document.getElementById('examName').value.trim();
+  if(!name){alert('請輸入考卷名稱');return;}
+  const grade=document.getElementById('examGrade').value;
+  const subject=document.getElementById('examSubject').value;
+  const total=Math.max(1,Math.min(60,parseInt(document.getElementById('examTotal').value)||10));
+  const roster=rosterData.filter(r=>r.seat||r.name).map(r=>({seat:r.seat.trim(),name:r.name.trim()}));
+  const exam={id:'e'+Date.now(),name,grade,subject,total,roster,
+    questions:Array.from({length:total},(_,i)=>({id:'q'+(i+1),number:i+1,type:'multiple_choice',correctAnswer:'',misconceptions:[],points:1})),
+    createdAt:new Date().toLocaleDateString('zh-TW')};
+  const exams=DB.get('exams',[]); exams.unshift(exam); DB.set('exams',exams);
+  currExam=exam.id;
+  document.getElementById('qbName').textContent=exam.name;
+  document.getElementById('qbBadge').textContent=sl(subject);
+  renderQL(exam);
+  document.getElementById('qBuilder').style.display='block';
+  document.getElementById('qBuilder').scrollIntoView({behavior:'smooth'});
+  renderExamList();
+  document.getElementById('examName').value='';
+  // Reset roster form
+  rosterData=[];renderRosterTable();
+  // Sync to GAS
+  if(DB.get('gasUrl',''))gasPost({action:'saveExam',exam}).catch(()=>{});
+}
+
+function renderQL(exam){
+  const sugg=(MCL[exam.subject]||[]).slice(0,5);
+  document.getElementById('qList').innerHTML=exam.questions.map(q=>`
+    <div class="card" style="margin-bottom:8px;padding:11px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;gap:7px;flex-wrap:wrap;">
+        <span style="font-weight:700;color:var(--pri);font-size:.88rem;">第 ${q.number} 題</span>
+        <div style="display:flex;gap:5px;align-items:center;">
+          <select class="fs" style="width:120px;padding:4px 7px;font-size:.76rem;"
+            onchange="uQ('${exam.id}','${q.id}','type',this.value)">
+            <option value="multiple_choice" ${q.type==='multiple_choice'?'selected':''}>選擇題</option>
+            <option value="fill_blank" ${q.type==='fill_blank'?'selected':''}>填充題</option>
+            <option value="short_answer" ${q.type==='short_answer'?'selected':''}>簡答題</option>
+          </select>
+          <button class="btn bd bsm" onclick="rmQ('${exam.id}','${q.id}')">✕</button>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg" style="margin-bottom:5px;"><label class="fl">正確答案</label>
+          <input type="text" class="fi" value="${esc(q.correctAnswer)}"
+            placeholder="${q.type==='multiple_choice'?'A/B/C/D':'答案'}" style="font-size:.83rem;"
+            onchange="uQ('${exam.id}','${q.id}','correctAnswer',this.value.trim())" /></div>
+        <div class="fg" style="margin-bottom:5px;"><label class="fl">配分</label>
+          <input type="number" class="fi" value="${q.points}" min="1" max="20" style="font-size:.83rem;"
+            onchange="uQ('${exam.id}','${q.id}','points',parseInt(this.value)||1)" /></div>
+      </div>
+      <div class="fg" style="margin-bottom:0;"><label class="fl">迷思概念標記</label>
+        <div style="display:flex;gap:4px;">
+          <input type="text" class="fi" id="mc-${q.id}" placeholder="輸入後 Enter 新增" style="font-size:.8rem;"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addMC('${exam.id}','${q.id}');}" />
+          <button class="btn bo bsm" onclick="addMC('${exam.id}','${q.id}')">+</button>
+        </div>
+        <div class="tr" id="mct-${q.id}">${q.misconceptions.map(m=>mTag(exam.id,q.id,m)).join('')}</div>
+        <div class="schips" style="margin-top:4px;">${sugg.map(m=>`<span class="sch" onclick="qAMC('${exam.id}','${q.id}','${m.replace(/'/g,"\\'")}')">+${m}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+}
+function mTag(eid,qid,m){return `<span class="tag">${esc(m)}<span class="tx" onclick="rmMC('${eid}','${qid}','${m.replace(/'/g,"\\'")}')"> ✕</span></span>`;}
+function uQ(eid,qid,f,v){const es=DB.get('exams',[]);const e=es.find(e=>e.id===eid);const q=e?.questions.find(q=>q.id===qid);if(q){q[f]=v;DB.set('exams',es);}}
+function addMC(eid,qid){const i=document.getElementById('mc-'+qid);const v=i.value.trim();if(!v)return;const es=DB.get('exams',[]);const e=es.find(e=>e.id===eid);const q=e.questions.find(q=>q.id===qid);if(!q.misconceptions.includes(v)){q.misconceptions.push(v);DB.set('exams',es);}document.getElementById('mct-'+qid).innerHTML=q.misconceptions.map(m=>mTag(eid,qid,m)).join('');i.value='';}
+function qAMC(eid,qid,m){const es=DB.get('exams',[]);const e=es.find(e=>e.id===eid);const q=e.questions.find(q=>q.id===qid);if(!q.misconceptions.includes(m)){q.misconceptions.push(m);DB.set('exams',es);}const el=document.getElementById('mct-'+qid);if(el)el.innerHTML=q.misconceptions.map(mc=>mTag(eid,qid,mc)).join('');}
+function rmMC(eid,qid,m){const es=DB.get('exams',[]);const e=es.find(e=>e.id===eid);const q=e.questions.find(q=>q.id===qid);q.misconceptions=q.misconceptions.filter(x=>x!==m);DB.set('exams',es);document.getElementById('mct-'+qid).innerHTML=q.misconceptions.map(mc=>mTag(eid,qid,mc)).join('');}
+function addQ(){const es=DB.get('exams',[]);const e=es.find(e=>e.id===currExam);if(!e)return;const n=e.questions.length+1;e.questions.push({id:'q'+n,number:n,type:'multiple_choice',correctAnswer:'',misconceptions:[],points:1});DB.set('exams',es);renderQL(e);}
+function rmQ(eid,qid){if(!confirm('刪除此題？'))return;const es=DB.get('exams',[]);const e=es.find(e=>e.id===eid);e.questions=e.questions.filter(q=>q.id!==qid);e.questions.forEach((q,i)=>{q.number=i+1;});DB.set('exams',es);renderQL(e);}
+function renderExamList(){
+  const exams=DB.get('exams',[]);const el=document.getElementById('examList');
+  if(!exams.length){el.innerHTML='<div class="empty"><div class="ei">📭</div><div>尚未建立考卷</div><button class="btn bp bsm" style="margin-top:12px;" onclick="document.getElementById(\'examName\').focus()">+ 建立第一份考卷</button></div>';return;}
+  el.innerHTML=exams.map(e=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px;border-bottom:1px solid var(--g100);">
+    <div><div style="font-weight:700;font-size:.87rem;">${esc(e.name)}</div>
+      <div style="font-size:.74rem;color:var(--g400);">${e.grade} · ${sl(e.subject)} · ${e.questions.length}題 · ${e.createdAt}</div></div>
+    <div class="br"><button class="btn bo bsm" onclick="editExam('${e.id}')">✏️</button>
+      <button class="btn bd bsm" onclick="delExam('${e.id}')">🗑️</button></div>
+  </div>`).join('');
+}
+function editExam(id){const e=DB.get('exams',[]).find(e=>e.id===id);if(!e)return;currExam=id;document.getElementById('qbName').textContent=e.name;document.getElementById('qbBadge').textContent=sl(e.subject);renderQL(e);document.getElementById('qBuilder').style.display='block';window.scrollTo(0,0);}
+function delExam(id){if(!confirm('刪除此考卷及相關記錄？'))return;DB.set('exams',DB.get('exams',[]).filter(e=>e.id!==id));DB.set('submissions',DB.get('submissions',[]).filter(s=>s.examId!==id));renderExamList();}
+
+// ══════ CAMERA ══════
+async function openWebcam(){
+  document.getElementById('camModal').classList.add('open');
+  document.getElementById('camFt').style.display='flex';
+  document.getElementById('camConfirmFt').style.display='none';
+  document.getElementById('camVideo').style.display='block';
+  document.getElementById('camCapturedImg').style.display='none';
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing,width:{ideal:1920},height:{ideal:1080}}});
+    document.getElementById('camVideo').srcObject=camStream;
+  }catch(e){
+    closeCamera();
+    // Fallback to file input
+    document.getElementById('camInput').click();
+  }
+}
+function captureFrame(){
+  const v=document.getElementById('camVideo');
+  const c=document.getElementById('camCanvas');
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  capturedB64=c.toDataURL('image/jpeg',0.92);
+  const img=document.getElementById('camCapturedImg');
+  img.src=capturedB64; img.style.display='block';
+  document.getElementById('camVideo').style.display='none';
+  document.getElementById('camFt').style.display='none';
+  document.getElementById('camConfirmFt').style.display='flex';
+  document.getElementById('camSwitchBtn').style.display='none';
+}
+function retakePhoto(){
+  document.getElementById('camVideo').style.display='block';
+  document.getElementById('camCapturedImg').style.display='none';
+  document.getElementById('camFt').style.display='flex';
+  document.getElementById('camConfirmFt').style.display='none';
+  document.getElementById('camSwitchBtn').style.display='block';
+  capturedB64=null;
+}
+function useCapture(){
+  if(!capturedB64)return;
+  photob64=capturedB64.split(',')[1];
+  document.getElementById('upPreview').src=capturedB64;
+  document.getElementById('upPreview').style.display='block';
+  document.getElementById('upPH').style.display='none';
+  document.getElementById('upa').classList.add('has');
+  closeCamera();
+}
+async function switchCamera(){
+  camFacing=camFacing==='environment'?'user':'environment';
+  if(camStream)camStream.getTracks().forEach(t=>t.stop());
+  try{camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing}});
+    document.getElementById('camVideo').srcObject=camStream;}catch{}
+}
+function closeCamera(){
+  if(camStream)camStream.getTracks().forEach(t=>t.stop());
+  camStream=null; capturedB64=null;
+  document.getElementById('camModal').classList.remove('open');
+}
+
+// ══════ INDIVIDUAL ANALYSIS ══════
+function renderIndSel(){
+  const exams=DB.get('exams',[]);const el=document.getElementById('indExamSel');
+  if(!exams.length){
+    el.innerHTML=`<div class="empty"><div class="ei">📝</div><div>尚未建立考卷</div>
+      <button class="btn bp bsm" style="margin-top:12px;" onclick="showTab('exams')">➕ 前往建立考卷</button></div>`;
+    return;
+  }
+  el.innerHTML=exams.map(e=>`<div class="ec ${indExam===e.id?'sel':''}" onclick="selInd('${e.id}')">
+    <div><div style="font-weight:700;font-size:.88rem;">${esc(e.name)}</div>
+      <div style="font-size:.74rem;color:var(--g400);">${e.grade} · ${sl(e.subject)} · ${e.questions.length}題</div></div>
+    <span class="bdg bb">${sl(e.subject)}</span></div>`).join('');
+}
+function selInd(id){
+  indExam=id;renderIndSel();
+  document.getElementById('indPanel').style.display='block';
+  document.getElementById('ansReview').style.display='none';
+  document.getElementById('indReport').innerHTML='';
+  document.getElementById('analyzeStatus').innerHTML='';
+  document.getElementById('sName').value='';
+  document.getElementById('sSeat').value='';
+  // Populate roster picker
+  const exam=DB.get('exams',[]).find(e=>e.id===id);
+  const roster=exam?.roster||[];
+  const picker=document.getElementById('rosterPicker');
+  const sel=document.getElementById('rosterSel');
+  if(roster.length){
+    sel.innerHTML='<option value="">── 手動輸入 ──</option>'+
+      roster.map(r=>`<option value="${esc(r.seat+'||'+r.name)}">${r.seat?r.seat+'. ':''}${esc(r.name)||'（無名）'}</option>`).join('');
+    picker.style.display='block';
+  }else{picker.style.display='none';}
+}
+function handleDragOver(e){e.preventDefault();document.getElementById('upa').classList.add('drag');}
+function handleDragLeave(){document.getElementById('upa').classList.remove('drag');}
+function handleDrop(e){e.preventDefault();handleDragLeave();const f=e.dataTransfer.files[0];if(f)loadFile(f);}
+function handleFile(e){const f=e.target.files[0];if(f)loadFile(f);}
+function loadFile(f){
+  const r=new FileReader();
+  r.onload=ev=>{photob64=ev.target.result.split(',')[1];
+    document.getElementById('upPreview').src=ev.target.result;
+    document.getElementById('upPreview').style.display='block';
+    document.getElementById('upPH').style.display='none';
+    document.getElementById('upa').classList.add('has');};
+  r.readAsDataURL(f);
+}
+function clearPhoto(){
+  photob64=null;
+  document.getElementById('upPreview').style.display='none';
+  document.getElementById('upPH').style.display='block';
+  document.getElementById('upa').classList.remove('has');
+  document.getElementById('galInput').value='';
+  document.getElementById('camInput').value='';
+  document.getElementById('ansReview').style.display='none';
+  document.getElementById('analyzeStatus').innerHTML='';
+}
+
+async function analyzePhoto(){
+  if(!photob64){alert('請先上傳或拍攝考卷');return;}
+  if(!indExam){alert('請先選擇考卷');return;}
+  const exam=DB.get('exams',[]).find(e=>e.id===indExam);
+  const st=document.getElementById('analyzeStatus');
+  st.innerHTML=`<div class="ld"><div class="sp"></div>AI 正在辨識考卷答案…</div>`;
+  const qDesc=exam.questions.map(q=>`第${q.number}題(${q.type==='multiple_choice'?'選擇':'填充'})`).join('、');
+  const prompt=`你是考卷批改助理，請辨識考卷照片中每題學生的答案。
+共${exam.questions.length}題：${qDesc}
+選擇題取圈選字母，填充/簡答取學生書寫內容，空白填""。
+僅回傳 JSON：{"q1":"A","q2":"B","q3":""}`;
+  try{
+    const raw=await AI.call(prompt,photob64);
+    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('回應格式錯誤，請重試');
+    extAns=JSON.parse(m[0]);
+    st.innerHTML=`<div class="al as">✅ 辨識完成（${AI.lastUsed}）！請確認答案後儲存。</div>`;
+    renderAnsGrid(exam);
+    document.getElementById('ansReview').style.display='block';
+  }catch(e){
+    st.innerHTML=`<div class="al ae">❌ 辨識失敗：${esc(e.message)}</div>`;
+  }
+}
+function renderAnsGrid(exam){
+  document.getElementById('ansGrid').innerHTML=exam.questions.map(q=>{
+    const ans=(extAns['q'+q.number]||'').toUpperCase().trim();
+    const cor=(q.correctAnswer||'').toUpperCase().trim();
+    const cls=!cor?'':ans===cor?'ok':'ng';
+    return `<div class="ac ${cls}">
+      <div style="font-size:.68rem;color:var(--g400);">第${q.number}題</div>
+      <div style="font-size:.67rem;margin:1px 0;">✅<strong style="color:var(--ok);">${esc(cor)||'?'}</strong></div>
+      <input type="text" class="fi" value="${esc(ans)}" style="font-size:.86rem;padding:4px;text-align:center;font-weight:700;margin-top:1px;"
+        oninput="extAns['q${q.number}']=this.value.toUpperCase();this.value=this.value.toUpperCase();" /></div>`;
+  }).join('');
+}
+function gradeAndSave(){
+  const name=document.getElementById('sName').value.trim();
+  const seat=document.getElementById('sSeat').value.trim();
+  if(!name){alert('請輸入學生姓名');return;}
+  const exam=DB.get('exams',[]).find(e=>e.id===indExam);
+  let score=0,total=0;const wrongMC=new Set();const qr={};
+  exam.questions.forEach(q=>{
+    total+=q.points;
+    const ans=(extAns['q'+q.number]||'').toUpperCase().trim();
+    const cor=(q.correctAnswer||'').toUpperCase().trim();
+    const ok=cor&&ans===cor;
+    qr['q'+q.number]={ans,correct:cor,isCorrect:ok};
+    if(ok)score+=q.points;else if(cor)q.misconceptions.forEach(m=>wrongMC.add(m));
+  });
+  const pct=total?Math.round(score/total*100):0;
+  const sub={id:'s'+Date.now(),examId:indExam,studentName:name,seatNo:seat,
+    answers:{...extAns},questionResults:qr,score,totalPts:total,percentage:pct,
+    misconceptions:Array.from(wrongMC),gradedAt:new Date().toLocaleDateString('zh-TW')};
+  const subs=DB.get('submissions',[]);
+  const idx=subs.findIndex(s=>s.examId===indExam&&s.studentName===name);
+  if(idx>=0)subs[idx]=sub;else subs.push(sub);
+  DB.set('submissions',subs);
+  // Sync to GAS
+  if(DB.get('gasUrl',''))syncToGAS(sub);
+  document.getElementById('ansReview').style.display='none';
+  clearPhoto();extAns={};
+  document.getElementById('sName').value='';document.getElementById('sSeat').value='';
+  renderIndReport(sub,exam);
+}
+function renderIndReport(sub,exam){
+  const sc=sub.percentage>=80?'sh':sub.percentage>=60?'sm':'sl2';
+  const ringColor=sub.percentage>=80?'#10b981':sub.percentage>=60?'#f59e0b':'#ef4444';
+  const r2=34,circ=2*Math.PI*r2,dash=circ*(sub.percentage/100);
+  const wrong=exam.questions.filter(q=>{const r=sub.questionResults?.['q'+q.number];return r&&!r.isCorrect&&r.correct;});
+  const rp=document.getElementById('indReport');
+  rp.innerHTML=`<div class="card">
+    <div class="ct">📋 個人分析報告</div>
+    <div class="rph">
+      <div class="scircle ${sc}">
+        <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="${r2}" fill="none" stroke="#e5e7eb" stroke-width="7"/>
+          <circle cx="40" cy="40" r="${r2}" fill="none" stroke="${ringColor}" stroke-width="7"
+            stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/></svg>
+        <div class="sv2">${sub.percentage}<div style="font-size:.55rem;font-weight:600;opacity:.7;margin-top:1px;">分</div></div>
+      </div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;">${esc(sub.studentName)}${sub.seatNo?' ('+sub.seatNo+')':''}</div>
+        <div style="font-size:.8rem;color:var(--g600);margin-top:2px;">${esc(exam.name)} · ${sub.gradedAt}</div>
+        <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="bdg bb">得分 ${sub.score}/${sub.totalPts}</span>
+          <span class="bdg ${sub.percentage>=80?'bg':sub.percentage>=60?'by':'br2'}">${sub.percentage>=80?'優秀':sub.percentage>=60?'及格':'待加強'}</span>
+          <span class="bdg bb">正確 ${exam.questions.length-wrong.length}/${exam.questions.length} 題</span>
+        </div>
+      </div>
+    </div>
+    ${sub.misconceptions.length?`<div style="margin-bottom:10px;">
+      <div style="font-weight:700;font-size:.84rem;margin-bottom:6px;">🧠 發現的迷思概念</div>
+      <div class="tr">${sub.misconceptions.map(m=>`<span class="bdg br2" style="font-size:.76rem;padding:4px 9px;">${esc(m)}</span>`).join('')}</div>
+    </div>`:`<div class="al as">🌟 全部答對，無迷思概念！</div>`}
+    ${wrong.length?`<div>
+      <div style="font-weight:700;font-size:.84rem;margin-bottom:6px;">❌ 答錯題目（${wrong.length}題）</div>
+      ${wrong.map(q=>{const r=sub.questionResults?.['q'+q.number];return `<div style="background:var(--g50);border-radius:8px;padding:8px 11px;margin-bottom:5px;border-left:3px solid var(--err);">
+        <div style="font-weight:600;font-size:.83rem;">第 ${q.number} 題</div>
+        <div style="font-size:.78rem;color:var(--g600);margin-top:2px;">作答：<strong style="color:var(--err);">${esc(r?.ans||'空白')}</strong> ·正確：<strong style="color:var(--ok);">${esc(r?.correct||'—')}</strong></div>
+        ${q.misconceptions.length?`<div class="tr" style="margin-top:4px;">${q.misconceptions.map(m=>`<span class="bdg br2" style="font-size:.66rem;">${esc(m)}</span>`).join('')}</div>`:''}
+      </div>`;}).join('')}
+    </div>`:''}
+    ${sub.misconceptions.length?`<div style="margin-top:10px;">
+      <button class="btn bp bsm" onclick="goRem('${exam.subject}','${sub.misconceptions[0]?.replace(/'/g,"\\'")||''}')">💡 生成補救題目</button>
+    </div>`:''}
+  </div>`;
+  rp.scrollIntoView({behavior:'smooth'});
+}
+
+// ══════ CLASS ANALYSIS ══════
+function renderClsSel(){
+  const exams=DB.get('exams',[]);const el=document.getElementById('clsExamSel');
+  if(!exams.length){el.innerHTML=`<div class="empty"><div class="ei">📝</div><div>請先建立考卷並批改</div>
+    <button class="btn bp bsm" style="margin-top:12px;" onclick="showTab('exams')">➕ 建立考卷</button></div>`;return;}
+  el.innerHTML=exams.map(e=>{
+    const cnt=DB.get('submissions',[]).filter(s=>s.examId===e.id).length;
+    return `<div class="ec ${clsExam===e.id?'sel':''}" onclick="showCls('${e.id}')">
+      <div><div style="font-weight:700;font-size:.88rem;">${esc(e.name)}</div>
+        <div style="font-size:.74rem;color:var(--g400);">${e.grade} · ${sl(e.subject)} · ${e.questions.length}題</div></div>
+      <span class="bdg bb">${cnt}人</span></div>`;
+  }).join('');
+}
+function showCls(id){
+  clsExam=id;renderClsSel();
+  const exam=DB.get('exams',[]).find(e=>e.id===id);
+  const subs=DB.get('submissions',[]).filter(s=>s.examId===id);
+  const panel=document.getElementById('clsPanel');
+  if(!subs.length){panel.innerHTML='<div class="card"><div class="empty"><div class="ei">📊</div><div>尚無批改記錄</div><button class="btn bp bsm" style="margin-top:12px;" onclick="showTab(\'ind\')">📷 開始批改考卷</button></div></div>';return;}
+  const scores=subs.map(s=>s.percentage);
+  const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+  const pass=scores.filter(s=>s>=60).length;
+  const bands=[0,0,0,0];scores.forEach(s=>{if(s<60)bands[0]++;else if(s<75)bands[1]++;else if(s<90)bands[2]++;else bands[3]++;});
+  const mcFreq={};subs.forEach(s=>s.misconceptions?.forEach(m=>{mcFreq[m]=(mcFreq[m]||0)+1;}));
+  const sortedMC=Object.entries(mcFreq).sort((a,b)=>b[1]-a[1]);
+  const qErr={};exam.questions.forEach(q=>{const c=subs.filter(s=>{const r=s.questionResults?.['q'+q.number];return r&&!r.isCorrect&&r.correct;}).length;if(c>0)qErr[q.number]=c;});
+  const sortedQErr=Object.entries(qErr).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  panel.innerHTML=`<div class="sg"><div class="sc"><div class="sv">${avg}分</div><div class="sl">班級平均</div></div>
+    <div class="sc g"><div class="sv">${Math.round(pass/subs.length*100)}%</div><div class="sl">及格率</div></div>
+    <div class="sc o"><div class="sv">${Math.max(...scores)}分</div><div class="sl">最高分</div></div>
+    <div class="sc r"><div class="sv">${Math.min(...scores)}分</div><div class="sl">最低分</div></div></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+    <div class="card"><div class="ct">📈 成績分佈</div><div class="cw"><canvas id="cClsScore"></canvas></div></div>
+    <div class="card"><div class="ct">🧠 迷思概念（人次）</div>
+      ${sortedMC.length?`<div class="cw"><canvas id="cClsMC"></canvas></div>`:`<div class="empty" style="padding:14px;">🎉 無迷思概念</div>`}
+    </div>
+  </div>
+
+  ${sortedQErr.length?`<div class="card"><div class="ct">❌ 各題錯誤人數</div>
+    <div class="cw"><canvas id="cClsQ"></canvas></div></div>`:''}
+
+  <div class="card"><div class="ct">🏆 學生成績排名</div>
+    <div class="cw tall"><canvas id="cClsRank"></canvas></div></div>
+
+  ${sortedMC.length?`<div class="card"><div class="ct">💡 補救建議</div>
+    <div class="tr">${sortedMC.map(([m,c])=>`<span class="bdg br2" style="cursor:pointer;padding:5px 10px;font-size:.76rem;"
+      onclick="goRem('${exam.subject}','${m.replace(/'/g,"\\'")}')">💡 ${esc(m)} (${c}人)</span>`).join('')}</div></div>`:''}
+
+  <div class="card"><div class="ct">👥 學生清單（${subs.length}人）</div>
+    ${subs.slice().sort((a,b)=>b.percentage-a.percentage).map(s=>`<div class="sr">
+      <div><div style="font-weight:600;font-size:.87rem;">${s.seatNo?s.seatNo+'. ':''}${esc(s.studentName)}</div>
+        <div style="font-size:.71rem;margin-top:2px;">${s.misconceptions?.length
+          ?s.misconceptions.slice(0,3).map(m=>`<span class="bdg br2" style="font-size:.65rem;">${esc(m)}</span>`).join(' ')
+          :'<span class="bdg bg" style="font-size:.65rem;">無迷思概念</span>'}</div></div>
+      <div style="font-weight:700;font-size:.95rem;color:${s.percentage>=80?'#065f46':s.percentage>=60?'#92400e':'#991b1b'};">${s.percentage}分</div>
+    </div>`).join('')}
+    <div style="margin-top:8px;"><button class="btn bd bsm" onclick="clearClsSubs('${id}')">🗑️ 清除記錄</button></div>
+  </div>`;
+
+  setTimeout(()=>{
+    // 成績分佈
+    const sc=document.getElementById('cClsScore');
+    if(sc)new Chart(sc,{type:'bar',data:{labels:['<60','60-74','75-89','90+'],
+      datasets:[{data:bands,backgroundColor:['#fca5a5','#fde68a','#6ee7b7','#818cf8'],borderRadius:5,borderSkipped:false,
+        borderColor:['#f87171','#fbbf24','#34d399','#6366f1'],borderWidth:1.5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>`${c.parsed.y} 人`}}},
+        scales:{y:{ticks:{stepSize:1},grid:{color:'#f3f4f6'}},x:{grid:{display:false}}}}});
+
+    // 迷思概念 Chart.js horizontal bar
+    const mc=document.getElementById('cClsMC');
+    if(mc&&sortedMC.length){
+      const top8=sortedMC.slice(0,8);
+      new Chart(mc,{type:'bar',data:{
+        labels:top8.map(([m])=>m.length>13?m.slice(0,13)+'…':m),
+        datasets:[{data:top8.map(([,c])=>c),
+          backgroundColor:top8.map(([,c])=>`rgba(239,68,68,${0.4+c/subs.length*0.6})`),
+          borderRadius:4,borderSkipped:false}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x} 人（${Math.round(c.parsed.x/subs.length*100)}%）`}}},
+          scales:{x:{ticks:{stepSize:1},grid:{color:'#f3f4f6'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});}
+
+    // 各題錯誤
+    if(sortedQErr.length){const qc=document.getElementById('cClsQ');
+      if(qc)new Chart(qc,{type:'bar',data:{labels:sortedQErr.map(([n])=>'第'+n+'題'),
+        datasets:[{data:sortedQErr.map(([,c])=>c),backgroundColor:'rgba(239,68,68,.7)',borderRadius:5,borderSkipped:false}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+          tooltip:{callbacks:{label:c=>`${c.parsed.y} 人答錯`}}},
+          scales:{y:{ticks:{stepSize:1},grid:{color:'#f3f4f6'}},x:{grid:{display:false}}}}});}
+
+    // 學生排名 horizontal bar
+    const rc=document.getElementById('cClsRank');
+    if(rc){
+      const ranked=subs.slice().sort((a,b)=>b.percentage-a.percentage);
+      const colors=ranked.map(s=>s.percentage>=80?'#6ee7b7':s.percentage>=60?'#fde68a':'#fca5a5');
+      new Chart(rc,{type:'bar',data:{
+        labels:ranked.map(s=>(s.seatNo?s.seatNo+'. ':'')+s.studentName),
+        datasets:[{data:ranked.map(s=>s.percentage),backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+        options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.x} 分`}}},
+          scales:{x:{min:0,max:100,ticks:{stepSize:20},grid:{color:'#f3f4f6'}},
+            y:{grid:{display:false},ticks:{font:{size:10}}}}}})}
+  },60);
+}
+function clearClsSubs(id){if(!confirm('確定清除？'))return;DB.set('submissions',DB.get('submissions',[]).filter(s=>s.examId!==id));showCls(id);}
+
+// ══════ REMEDIATION ══════
+function updateRemS(){
+  const s=document.getElementById('remSubj')?.value||'math';
+  const el=document.getElementById('remSugg');if(!el)return;
+  el.innerHTML=(MCL[s]||[]).map(m=>`<span class="sch" onclick="document.getElementById('remMC').value='${m.replace(/'/g,"\\'")}'">${m}</span>`).join('');
+}
+async function genRem(){
+  const mc=document.getElementById('remMC').value.trim();if(!mc){alert('請輸入迷思概念');return;}
+  const sub=document.getElementById('remSubj').value,grade=document.getElementById('remGrade').value;
+  const cnt=document.getElementById('remCnt').value,type=document.getElementById('remType').value;
+  const extra=document.getElementById('remExtra').value.trim();
+  const res=document.getElementById('remResult');
+  res.innerHTML=`<div class="ld"><div class="sp"></div>生成補救題目中…</div>`;
+  const typeMap={mixed:'混合選擇與填充',choice:'全選擇題(含四選項)',fill:'全填充/簡答'};
+  const p=`你是${sl(sub)}補救教學專家（台灣${grade}）。
+迷思概念：「${mc}」，題型：${typeMap[type]}，題數：${cnt}
+${extra?'補充：'+extra:''}
+請分析成因並設計補救練習題。
+僅回傳 JSON：{"analysis":"成因分析","questions":[{"number":1,"type":"選擇題","question":"題目","options":["A.","B.","C.","D."],"answer":"B","explanation":"解析"}]}`;
+  try{
+    const raw=await AI.call(p);
+    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('格式錯誤');
+    const r=JSON.parse(m[0]);
+    res.innerHTML=`<div class="card">
+      <div class="ct">🧠 迷思概念分析</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">
+        <span class="bdg br2">${esc(mc)}</span><span class="bdg bb">${sl(sub)}</span>
+        <span class="bdg by">${esc(grade)}</span>
+        <span class="bdg bgr">使用 ${AI.lastUsed}</span></div>
+      <div style="background:#fef9c3;border-left:4px solid var(--warn);border-radius:0 8px 8px 0;padding:11px;font-size:.86rem;line-height:1.7;color:#78350f;">${esc(r.analysis||'').replace(/\n/g,'<br>')}</div>
+    </div>
+    <div class="card"><div class="ct">📝 補救練習題（${(r.questions||[]).length}題）</div>
+      ${(r.questions||[]).map(q=>`<div class="rq">
+        <div class="rq-t">第 ${q.number} 題 <span class="bdg bb" style="font-size:.67rem;">${esc(q.type)}</span></div>
+        <div style="line-height:1.7;font-size:.87rem;">${esc(q.question).replace(/\n/g,'<br>')}</div>
+        ${q.options?.length?`<div style="margin-top:6px;font-size:.83rem;line-height:2;color:var(--g700);">${q.options.map(o=>esc(o)).join('<br>')}</div>`:''}
+        <div class="rq-a">✅ 答案：${esc(q.answer)}</div>
+        <div class="rq-e">💡 解析：${esc(q.explanation||'').replace(/\n/g,'<br>')}</div>
+      </div>`).join('')}
+      <div class="br" style="margin-top:10px;">
+        <button class="btn bo bsm" onclick="window.print()">🖨️ 列印</button>
+        <button class="btn bp bsm" onclick="genRem()">🔄 重新生成</button></div>
+    </div>`;
+  }catch(e){res.innerHTML=`<div class="al ae">❌ 失敗：${esc(e.message)}</div>`;}
+}
+function goRem(sub,mc){
+  document.getElementById('remSubj').value=sub;
+  document.getElementById('remMC').value=mc;
+  showTab('rem');updateRemS();window.scrollTo(0,0);
+}
+
+// ══════ SETTINGS ══════
+function loadSettings(){
+  document.getElementById('gemKey').value=DB.get('gemKey','')||'';
+  document.getElementById('oaiKey').value=DB.get('oaiKey','')||'';
+  document.getElementById('gasUrl').value=DB.get('gasUrl','')||'';
+  const pri=DB.get('priAPI','auto');
+  document.getElementById('ptG').classList.toggle('active',pri==='gemini');
+  document.getElementById('ptO').classList.toggle('active',pri==='openai');
+  document.getElementById('ptA').classList.toggle('active',pri==='auto');
+  setMUI('gemini',DB.get('gModel','gemini-1.5-flash'));
+  setMUI('openai',DB.get('oModel','gpt-4o-mini'));
+  setSyncStatus(DB.get('gasUrl','')?'synced':'none');
+}
+function setPri(p){DB.set('priAPI',p);loadSettings();}
+function setM(pr,m){DB.set(pr==='gemini'?'gModel':'oModel',m);setMUI(pr,m);}
+function setMUI(pr,m){document.querySelectorAll(`#${pr==='gemini'?'g':'o'}Models .mc2`).forEach(c=>c.classList.toggle('active',c.dataset.m===m));}
+function saveSettings(){
+  const gk=document.getElementById('gemKey').value.trim();
+  const ok=document.getElementById('oaiKey').value.trim();
+  const gu=document.getElementById('gasUrl').value.trim();
+  if(!gk&&!ok){showMsg('settingsMsg','請至少輸入一組 API Key','ae');return;}
+  if(gk)DB.set('gemKey',gk);if(ok)DB.set('oaiKey',ok);
+  if(gu)DB.set('gasUrl',gu);
+  showMsg('settingsMsg','✅ 設定已儲存','as');
+  updateHdBadges();
+  if(gu)setSyncStatus('offline');
+}
+async function testApi(pr){
+  const key=(document.getElementById(pr==='gemini'?'gemKey':'oaiKey').value.trim())||DB.get(pr==='gemini'?'gemKey':'oaiKey','');
+  if(!key){alert('請輸入 API Key');return;}
+  const dot=document.getElementById(pr==='gemini'?'gDot':'oDot');
+  const txt=document.getElementById(pr==='gemini'?'gTxt':'oTxt');
+  dot.className='dot';txt.textContent='測試中…';
+  try{
+    if(pr==='gemini'){
+      const m=DB.get('gModel','gemini-1.5-flash');
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'say ok'}]}],generationConfig:{maxOutputTokens:5}})});
+      const d=await r.json();if(!r.ok)throw new Error(d.error?.message);
+    }else{
+      const m=DB.get('oModel','gpt-4o-mini');
+      const r=await fetch('https://api.openai.com/v1/chat/completions',
+        {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:m,messages:[{role:'user',content:'say ok'}],max_tokens:5})});
+      const d=await r.json();if(!r.ok)throw new Error(d.error?.message);
+    }
+    dot.className='dot ok';txt.textContent='✅ 連線正常';
+  }catch(e){dot.className='dot err';txt.textContent='❌ '+e.message.slice(0,35);}
+}
+function updateHdBadges(){
+  const gk=DB.get('gemKey',''),ok=DB.get('oaiKey','');
+  document.getElementById('hdGemini').className='api-badge '+(gk?'api-on':'api-off');
+  document.getElementById('hdOpenai').className='api-badge '+(ok?'api-on':'api-off');
+}
+
+// ══════ UTILS ══════
+function esc(s){if(typeof s!=='string')return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function ld(msg){return `<div class="ld"><div class="sp"></div>${msg}</div>`;}
+function showMsg(id,msg,cls){const el=document.getElementById(id);if(!el)return;el.innerHTML=`<div class="al ${cls}">${msg}</div>`;setTimeout(()=>{el.innerHTML='';},3000);}
+
+// ══════ INIT ══════
+window.addEventListener('DOMContentLoaded',()=>{
+  loadSettings();
+  renderDashboard();
+  const url=DB.get('gasUrl','');
+  if(url)setSyncStatus('offline');else setSyncStatus('none');
+});
+</script>
+</body>
+</html>
