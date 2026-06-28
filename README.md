@@ -106,4 +106,4 @@ Abot/
 - API Key 僅儲存於本機瀏覽器，不會傳送至任何第三方伺服器
 - 考卷照片經 Base64 編碼後直接傳送至 Google / OpenAI API 進行分析
 - 建議使用 Chrome / Edge 瀏覽器以獲得最佳體驗
-- 手機使用時相機功能透過 `capture="en
+- 手機使用時相機功能透過 `capture="environment"` 調用後置鏡頭
