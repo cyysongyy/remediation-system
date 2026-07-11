@@ -75,7 +75,19 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
 .bup-icon{font-size:2.5rem;margin-bottom:8px;}
 .bup-label{font-weight:700;font-size:.95rem;color:var(--g700);}
 .bup-sub{font-size:.75rem;color:var(--g400);margin-top:4px;}
-#batchInput{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+#batchInput,#vInput{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;}
+/* 空白考卷檢核 */
+#vGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px;}
+.vsep{display:flex;align-items:center;gap:10px;margin:18px 0 10px;}
+.vsep-line{flex:1;height:3px;background:var(--pri);opacity:.25;border-radius:2px;}
+.vsep-label{font-size:.8rem;font-weight:800;color:#fff;background:var(--pri);padding:4px 14px;
+  border-radius:20px;white-space:nowrap;box-shadow:0 1px 4px rgba(79,70,229,.35);}
+.vsec-t{font-weight:700;font-size:.85rem;margin:12px 0 7px;}
+.vissue{border-left:4px solid var(--err);background:#fff5f5;border-radius:0 8px 8px 0;
+  padding:9px 12px;margin-bottom:7px;font-size:.82rem;line-height:1.65;}
+.vissue.dup{border-left-color:var(--warn);background:#fffbeb;}
+.vissue.lang{border-left-color:#9333ea;background:#faf5ff;}
+.bdg.bpu{background:#f3e8ff;color:#6b21a8;}
 .student-upload-hint{
   background:var(--pril);border:2px dashed var(--pri);border-radius:10px;
   padding:12px 14px;margin:4px 0 8px;
@@ -244,6 +256,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
 </div>
 
 <div class="nav">
+  <div class="nt" onclick="showTab('validate')">🔍 考卷檢核</div>
   <div class="nt active" onclick="showTab('dash')">🏠 首頁</div>
   <div class="nt" onclick="showTab('grade')">📷 批改考卷</div>
   <div class="nt" onclick="showTab('cls')">📊 班級分析</div>
@@ -253,6 +266,41 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
 </div>
 
 <div class="main">
+
+  <div class="sec" id="sec-validate">
+    <div class="card">
+      <div class="ct">🔍 空白考卷 AI 檢核</div>
+      <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 檢查<strong>空白考卷</strong>是否有問題：<br>
+        ❌ 題目錯誤（無法算出答案、條件矛盾、選項無正確答案）　🔁 重複的題目或選項　🚫 用語不當（性暗示、不雅俚語、偏頗的政治意識形態）<br>
+        可一次上傳<strong>多張照片</strong>，每張視為一份獨立考卷，AI 會逐張檢測並自動辨識<strong>年級與科目</strong>。</div>
+      <div class="bup" id="vupZone"
+        ondrop="handleVDrop(event)" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
+        <input type="file" id="vInput" multiple accept="image/*" onchange="handleVFiles(event)"/>
+        <div id="vupPH">
+          <div class="bup-icon">🔍</div>
+          <div class="bup-label">拖放或點擊選取空白考卷照片</div>
+          <div class="bup-sub">可一次選取多張 · 每張照片視為一份考卷 · 支援 JPG · PNG</div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn bo" onclick="openCamForValidate()">📷 用相機拍攝</button>
+        <button class="btn bsm" style="background:var(--g100);color:var(--g700);" onclick="document.getElementById('vInput').click()">🖼️ 從相簿選取</button>
+        <button class="btn bd bsm" id="vClearBtn" style="display:none;" onclick="clearVBatch()">🗑️ 清除全部</button>
+      </div>
+      <div id="vGrid"></div>
+      <div id="vProgArea" style="display:none;margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px;">
+          <span id="vProgLabel" style="font-weight:600;">檢測中…</span>
+          <span id="vProgCount" style="color:var(--g400);"></span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="vProgFill" style="width:0%"></div></div>
+      </div>
+      <button class="btn bp bfull" id="vStartBtn" style="margin-top:12px;display:none;" onclick="startValidate()">
+        🤖 開始 AI 檢測
+      </button>
+    </div>
+    <div id="vResults"></div>
+  </div>
 
   <div class="sec active" id="sec-dash">
     <div class="sg" id="dashStats"></div>
@@ -284,6 +332,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
     <div class="card">
       <div class="ct">⚡ 快速操作</div>
       <div class="qg">
+        <div class="qc" onclick="showTab('validate')"><div class="qi-icon">🔍</div><div class="qi-lbl">考卷檢核</div></div>
         <div class="qc" onclick="showTab('grade')"><div class="qi-icon">📷</div><div class="qi-lbl">批改考卷</div></div>
         <div class="qc" onclick="showTab('cls')"><div class="qi-icon">📊</div><div class="qi-lbl">班級分析</div></div>
         <div class="qc" onclick="showTab('rem')"><div class="qi-icon">💡</div><div class="qi-lbl">補救題目</div></div>
@@ -557,6 +606,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
     <div class="card">
       <div class="ct">✨ 功能特色</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+        <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🔍</div><div style="font-weight:700;font-size:.83rem;">考卷檢核</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">印製前 AI 檢查空白考卷：錯誤題目、重複、不當用語</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🤖</div><div style="font-weight:700;font-size:.83rem;">多模態 AI</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">同時支援 Gemini + GPT-4o，自動備援</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">📸</div><div style="font-weight:700;font-size:.83rem;">批次批改</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">一次上傳多張，逐張分析</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🧠</div><div style="font-weight:700;font-size:.83rem;">迷思偵測</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">AI 自動找出答題錯誤背後的概念誤解</div></div>
@@ -668,10 +718,11 @@ async function openCam(target){
   try{
     camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing}});
     document.getElementById('camVideo').srcObject=camStream;
-  }catch{closeCamera();document.getElementById(target==='key'?'akInput':'batchInput').click();}
+  }catch{closeCamera();document.getElementById(target==='key'?'akInput':target==='validate'?'vInput':'batchInput').click();}
 }
 function openCamForKey(){openCam('key');}
 function openCamForBatch(){openCam('batch');}
+function openCamForValidate(){openCam('validate');}
 function captureFrame(){
   const v=document.getElementById('camVideo'),c=document.getElementById('camCanvas');
   c.width=v.videoWidth;c.height=v.videoHeight;
@@ -693,6 +744,7 @@ function addCapturedToBatch(){
   const dataUrl=document.getElementById('camCapturedImg').src;
   if(!dataUrl)return;
   if(camTarget==='key'){answerKeyB64=dataUrl.split(',')[1];showAnswerKey(dataUrl);}
+  else if(camTarget==='validate'){const name='拍照_'+new Date().toTimeString().slice(0,5)+'.jpg';addVFile(name,dataUrl.split(',')[1],dataUrl);}
   else{const name='拍照_'+new Date().toTimeString().slice(0,5)+'.jpg';addFileToBatch(name,dataUrl.split(',')[1],dataUrl);}
   closeCamera();
 }
@@ -1213,6 +1265,166 @@ function appendError(file){
   area.appendChild(div);
 }
 
+/* ══════════ 空白考卷 AI 檢核 ══════════ */
+let vFiles=[];
+
+function handleVFiles(e){addVList(e.target.files);}
+function handleVDrop(e){
+  e.preventDefault();document.getElementById('vupZone').classList.remove('drag');
+  addVList(e.dataTransfer.files);
+}
+function addVList(files){
+  [...files].forEach(f=>{
+    if(!f.type.startsWith('image/'))return;
+    const r=new FileReader();
+    r.onload=ev=>addVFile(f.name,ev.target.result.split(',')[1],ev.target.result);
+    r.readAsDataURL(f);
+  });
+}
+function addVFile(name,b64,dataUrl){
+  vFiles.push({id:'v'+Date.now()+Math.random().toString(36).slice(2),name,b64,dataUrl,status:'pending'});
+  renderVGrid();
+}
+function removeVFile(id){vFiles=vFiles.filter(f=>f.id!==id);renderVGrid();}
+function clearVBatch(){
+  vFiles=[];renderVGrid();
+  document.getElementById('vInput').value='';
+  document.getElementById('vResults').innerHTML='';
+  document.getElementById('vProgArea').style.display='none';
+  const btn=document.getElementById('vStartBtn');btn.disabled=false;btn.textContent='🤖 開始 AI 檢測';
+}
+function renderVGrid(){
+  const grid=document.getElementById('vGrid');
+  if(!vFiles.length){
+    grid.innerHTML='';
+    document.getElementById('vStartBtn').style.display='none';
+    document.getElementById('vClearBtn').style.display='none';
+    document.getElementById('vupPH').style.display='block';
+    return;
+  }
+  document.getElementById('vupPH').style.display='none';
+  document.getElementById('vStartBtn').style.display='flex';
+  document.getElementById('vClearBtn').style.display='inline-flex';
+  grid.innerHTML=vFiles.map((f,i)=>`<div class="pcard ${f.status}">
+    <img src="${f.dataUrl}" alt="${esc(f.name)}"/>
+    <div class="pname">考卷${i+1} · ${esc(f.name)}</div>
+    ${f.status==='pending'?`<button class="pdel" onclick="removeVFile('${f.id}')">✕</button>`:''}
+    ${f.status==='processing'?`<div class="pstatus"><span class="sp sm" style="display:inline-block;margin-right:3px;"></span>檢測中</div>`:''}
+    ${f.status==='done'?`<div class="pstatus">✅ 完成</div>`:''}
+    ${f.status==='error'?`<div class="pstatus">❌ 失敗</div>`:''}
+  </div>`).join('');
+}
+
+async function startValidate(){
+  if(!vFiles.length){alert('請先上傳空白考卷照片');return;}
+  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini 或 OpenAI API Key');return;}
+  const btn=document.getElementById('vStartBtn');
+  btn.disabled=true;btn.textContent='⏳ 檢測中…';
+  const progFill=document.getElementById('vProgFill');
+  const progLabel=document.getElementById('vProgLabel');
+  const progCount=document.getElementById('vProgCount');
+  document.getElementById('vProgArea').style.display='block';
+  document.getElementById('vResults').innerHTML='';
+  progFill.style.width='0%';
+  vFiles.forEach(f=>f.status='pending');
+  const total=vFiles.length;
+  let done=0;
+  for(const f of vFiles){
+    f.status='processing';renderVGrid();
+    progLabel.textContent=`檢測第 ${done+1}/${total} 份考卷…`;
+    progCount.textContent=`${done}/${total} 份完成`;
+    try{
+      const r=await analyzeBlankPaper(f);
+      f.status='done';
+      appendVResult(f,r,done);
+    }catch(e){
+      f.status='error';
+      appendVError(f,e,done);
+    }
+    done++;
+    progFill.style.width=(done/total*100)+'%';
+    renderVGrid();
+  }
+  progLabel.textContent=`✅ 檢測完成！共 ${total} 份考卷`;
+  progCount.textContent=`${total}/${total} 份完成`;
+  btn.disabled=false;btn.textContent='🔄 重新檢測';
+}
+
+async function analyzeBlankPaper(f){
+  const prompt=`你是台灣中小學考卷審題專家。這是一張「尚未作答的空白考卷」照片，請以審題角度仔細檢查整份考卷內容品質。
+
+【檢查項目】
+1. 辨識這份考卷的「年級」與「科目」（優先以考卷標題為準，無標題則依題目內容推斷）。
+2. 題目錯誤：無法算出答案、條件不足或互相矛盾、答案不唯一、選擇題選項中沒有正確答案、題意不清、明顯的文字或數字錯誤。
+3. 重複之處：重複出現的題目、同一題內重複的選項、重複的段落或文字。
+4. 用語不當：性暗示、不雅的俚語或粗俗用語、偏頗的政治意識形態、歧視性或刻板印象字眼。
+
+只回傳 JSON（不要 markdown）：
+{
+  "grade": "五年級",
+  "subject": "數學",
+  "examTitle": "考卷標題（若未標示請填「未標示」）",
+  "summary": "一到兩句整體評述",
+  "contentIssues": [{"location":"第3題","type":"無法算出答案","description":"問題說明","suggestion":"修改建議"}],
+  "duplicates": [{"location":"第5題與第12題","description":"重複內容說明","suggestion":"修改建議"}],
+  "inappropriate": [{"location":"第7題","type":"性暗示／不雅俚語／政治意識形態偏頗／歧視用語","text":"原文摘錄","description":"為何不妥","suggestion":"建議改寫"}]
+}
+若某類別沒有發現問題，該欄位回傳空陣列 []。`;
+  const raw=await AI.call(prompt,f.b64);
+  return parseAIJson(raw);
+}
+
+function vSep(idx){
+  const sep=document.createElement('div');sep.className='vsep';
+  sep.innerHTML=`<div class="vsep-line"></div><div class="vsep-label">📄 第 ${idx+1} 份考卷</div><div class="vsep-line"></div>`;
+  return sep;
+}
+
+function appendVResult(f,r,idx){
+  const area=document.getElementById('vResults');
+  area.appendChild(vSep(idx));
+  const ci=Array.isArray(r.contentIssues)?r.contentIssues:[];
+  const du=Array.isArray(r.duplicates)?r.duplicates:[];
+  const ip=Array.isArray(r.inappropriate)?r.inappropriate:[];
+  const total=ci.length+du.length+ip.length;
+  const issueHtml=(x,cls,badgeCls)=>`<div class="vissue ${cls}">
+    <strong>${esc(x.location||'位置未標示')}</strong>${x.type?` <span class="bdg ${badgeCls}" style="font-size:.64rem;">${esc(x.type)}</span>`:''}
+    ${x.text?`<div style="margin-top:3px;color:var(--g600);">原文：「${esc(x.text)}」</div>`:''}
+    <div style="margin-top:2px;">${esc(x.description||'')}</div>
+    ${x.suggestion?`<div style="color:#065f46;margin-top:3px;">💡 建議：${esc(x.suggestion)}</div>`:''}
+  </div>`;
+  const div=document.createElement('div');div.className='card';
+  div.style.borderLeft=`5px solid ${total?'var(--err)':'var(--ok)'}`;
+  div.innerHTML=`
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;">
+      <img src="${f.dataUrl}" style="width:64px;height:84px;object-fit:cover;border-radius:8px;border:2px solid var(--g200);flex-shrink:0;"/>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:.92rem;">${esc(r.examTitle&&r.examTitle!=='未標示'?r.examTitle:f.name)}</div>
+        <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="bdg bb">🎓 ${esc(r.grade||'年級無法辨識')}</span>
+          <span class="bdg bb">📚 ${esc(r.subject||'科目無法辨識')}</span>
+          <span class="bdg ${total?'br2':'bg'}">${total?`⚠️ 發現 ${total} 個問題`:'✅ 未發現問題'}</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--g400);margin-top:4px;">檔案：${esc(f.name)}</div>
+      </div>
+    </div>
+    ${r.summary?`<div class="al ai" style="font-size:.8rem;">📋 ${esc(r.summary)}</div>`:''}
+    ${ci.length?`<div class="vsec-t">❌ 題目錯誤（${ci.length}）</div>`+ci.map(x=>issueHtml(x,'','br2')).join(''):''}
+    ${du.length?`<div class="vsec-t">🔁 重複之處（${du.length}）</div>`+du.map(x=>issueHtml(x,'dup','by')).join(''):''}
+    ${ip.length?`<div class="vsec-t">🚫 用語不當（${ip.length}）</div>`+ip.map(x=>issueHtml(x,'lang','bpu')).join(''):''}
+    ${!total?`<div class="al as" style="margin-bottom:0;">✅ 內容檢核通過：未發現無法作答、重複或用語不當之處。</div>`:''}`;
+  area.appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function appendVError(f,e,idx){
+  const area=document.getElementById('vResults');
+  area.appendChild(vSep(idx));
+  const div=document.createElement('div');div.className='al ae';
+  div.innerHTML=`❌ <strong>${esc(f.name)}</strong> 檢測失敗：${esc(e.message||'未知錯誤')}`;
+  area.appendChild(div);
+}
+
 function renderClsSel(){
   const exams=DB.get('exams',[]);
   const el=document.getElementById('clsExamSel');
@@ -1446,7 +1658,7 @@ async function genRem(){
 }
 function goRem(sub,mc){document.getElementById('remSubj').value=sub;document.getElementById('remMC').value=mc;showTab('rem');updateRemS();renderRemAuto();setTimeout(genRem,100);}
 
-const TABS=['dash','grade','cls','rem','settings','help'];
+const TABS=['validate','dash','grade','cls','rem','settings','help'];
 function showTab(t){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nt').forEach((n,i)=>n.classList.toggle('active',TABS[i]===t));
