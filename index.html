@@ -606,7 +606,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
     <div class="card">
       <div class="ct">✨ 功能特色</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
-        <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🔍</div><div style="font-weight:700;font-size:.83rem;">考卷檢核</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">印製前 AI 檢查空白考卷：錯誤題目、重複、不當用語</div></div>
+        <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🔍</div><div style="font-weight:700;font-size:.83rem;">考卷檢核</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">印製前 AI 檢查空白考卷：錯誤、重複、不當用語、難易配置與命題建議</div></div>
+        <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🧑‍🏫</div><div style="font-weight:700;font-size:.83rem;">教師分析報告</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">全班質性＋量化分析，找出學生與教學端迷思，一鍵補救</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🤖</div><div style="font-weight:700;font-size:.83rem;">多模態 AI</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">同時支援 Gemini + GPT-4o，自動備援</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">📸</div><div style="font-weight:700;font-size:.83rem;">批次批改</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">一次上傳多張，逐張分析</div></div>
         <div style="background:var(--g50);border-radius:10px;padding:11px;"><div style="font-size:1.3rem;margin-bottom:4px;">🧠</div><div style="font-weight:700;font-size:.83rem;">迷思偵測</div><div style="font-size:.75rem;color:var(--g400);margin-top:2px;line-height:1.5;">AI 自動找出答題錯誤背後的概念誤解</div></div>
@@ -1134,6 +1135,7 @@ async function startBatchGrade(){
         score:result.score??0,totalQuestions:result.totalQuestions||0,
         percentage:result.percentage??0,misconceptions:result.misconceptions||[],
         wrongQuestions:result.wrongQuestions||[],teacherNotes:result.teacherNotes||'',
+        errorDetails:Array.isArray(result.errorDetails)?result.errorDetails:[],
         gradedAt:new Date().toLocaleDateString('zh-TW'),
         fileName:group.map(f=>f.name).join('、'),
         pageCount:group.length};
@@ -1172,8 +1174,9 @@ ${roster}
 3. 總題數與答對題數
 4. 分數或百分比
 5. 答錯的題號
-6. 推斷的迷思概念（具體說明是哪個概念理解錯誤）
-7. 給老師的補救建議
+6. 每一個答錯題目的錯誤分析：錯誤類型（概念錯誤／計算粗心／題意誤解／未作答）、該題難易度（易／中／難）、簡短說明
+7. 推斷的迷思概念（具體說明是哪個概念理解錯誤）
+8. 給老師的補救建議
 
 只回傳 JSON（不要 markdown）：
 {
@@ -1184,6 +1187,7 @@ ${roster}
   "score": 75,
   "percentage": 75,
   "wrongQuestions": [3,7,12],
+  "errorDetails": [{"question":3,"errorType":"概念錯誤","difficulty":"中","note":"通分時分母處理錯誤"}],
   "misconceptions": ["分數加減通分概念錯誤","小數點位置混淆"],
   "teacherNotes": "建議加強分數單元練習"
 }`;
@@ -1254,6 +1258,15 @@ function appendResult(sub,exam,r){
     </div>
     ${sub.misconceptions?.length?`<div class="mc-tags">${sub.misconceptions.map(m=>`<span class="mctag">${esc(m)}</span>`).join('')}</div>`
     :`<div class="mc-tags"><span class="mctag ok">✅ 未發現明顯迷思概念</span></div>`}
+    ${(sub.errorDetails||[]).length?`<div style="margin-top:8px;overflow-x:auto;">
+      <table class="hist-table" style="font-size:.76rem;">
+        <thead><tr><th>題號</th><th>難易</th><th>錯誤類型</th><th>說明</th></tr></thead>
+        <tbody>${sub.errorDetails.map(d=>`<tr>
+          <td style="font-weight:600;white-space:nowrap;">第${esc(String(d.question??'?'))}題</td>
+          <td><span class="bdg ${d.difficulty==='易'?'bg':d.difficulty==='難'?'br2':'by'}" style="font-size:.64rem;">${esc(d.difficulty||'中')}</span></td>
+          <td style="white-space:nowrap;">${esc(d.errorType||'—')}</td>
+          <td>${esc(d.note||'')}</td></tr>`).join('')}</tbody>
+      </table></div>`:''}
     ${sub.teacherNotes?`<div style="font-size:.79rem;color:var(--g600);margin-top:7px;background:rgba(0,0,0,.04);padding:6px 9px;border-radius:6px;">💡 ${esc(sub.teacherNotes)}</div>`:''}
     ${sub.misconceptions?.length?`<div style="margin-top:8px;"><button class="btn bp bsm" onclick="goRem('${exam.subject}','${esc(sub.misconceptions[0])}')">💡 生成補救題目</button></div>`:''}`;
   area.appendChild(div);div.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1358,6 +1371,8 @@ async function analyzeBlankPaper(f){
 2. 題目錯誤：無法算出答案、條件不足或互相矛盾、答案不唯一、選擇題選項中沒有正確答案、題意不清、明顯的文字或數字錯誤。
 3. 重複之處：重複出現的題目、同一題內重複的選項、重複的段落或文字。
 4. 用語不當：性暗示、不雅的俚語或粗俗用語、偏頗的政治意識形態、歧視性或刻板印象字眼。
+5. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），並評論難易配置對此年級是否恰當。
+6. 給老師的命題建議：從題目設計、範圍涵蓋、難易配置、鑑別度、版面編排等角度，給老師 2～5 條具體可行的建議。
 
 只回傳 JSON（不要 markdown）：
 {
@@ -1367,7 +1382,9 @@ async function analyzeBlankPaper(f){
   "summary": "一到兩句整體評述",
   "contentIssues": [{"location":"第3題","type":"無法算出答案","description":"問題說明","suggestion":"修改建議"}],
   "duplicates": [{"location":"第5題與第12題","description":"重複內容說明","suggestion":"修改建議"}],
-  "inappropriate": [{"location":"第7題","type":"性暗示／不雅俚語／政治意識形態偏頗／歧視用語","text":"原文摘錄","description":"為何不妥","suggestion":"建議改寫"}]
+  "inappropriate": [{"location":"第7題","type":"性暗示／不雅俚語／政治意識形態偏頗／歧視用語","text":"原文摘錄","description":"為何不妥","suggestion":"建議改寫"}],
+  "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置是否恰當的評論"},
+  "teacherAdvice": ["給老師的命題建議1", "建議2"]
 }
 若某類別沒有發現問題，該欄位回傳空陣列 []。`;
   const raw=await AI.call(prompt,f.b64);
@@ -1387,6 +1404,10 @@ function appendVResult(f,r,idx){
   const du=Array.isArray(r.duplicates)?r.duplicates:[];
   const ip=Array.isArray(r.inappropriate)?r.inappropriate:[];
   const total=ci.length+du.length+ip.length;
+  const adv=Array.isArray(r.teacherAdvice)?r.teacherAdvice:[];
+  const dE=Math.max(0,Number(r.difficulty?.easy)||0),dM=Math.max(0,Number(r.difficulty?.medium)||0),dH=Math.max(0,Number(r.difficulty?.hard)||0);
+  const dSum=dE+dM+dH;
+  const dPct=v=>Math.round(v/dSum*100);
   const issueHtml=(x,cls,badgeCls)=>`<div class="vissue ${cls}">
     <strong>${esc(x.location||'位置未標示')}</strong>${x.type?` <span class="bdg ${badgeCls}" style="font-size:.64rem;">${esc(x.type)}</span>`:''}
     ${x.text?`<div style="margin-top:3px;color:var(--g600);">原文：「${esc(x.text)}」</div>`:''}
@@ -1412,7 +1433,21 @@ function appendVResult(f,r,idx){
     ${ci.length?`<div class="vsec-t">❌ 題目錯誤（${ci.length}）</div>`+ci.map(x=>issueHtml(x,'','br2')).join(''):''}
     ${du.length?`<div class="vsec-t">🔁 重複之處（${du.length}）</div>`+du.map(x=>issueHtml(x,'dup','by')).join(''):''}
     ${ip.length?`<div class="vsec-t">🚫 用語不當（${ip.length}）</div>`+ip.map(x=>issueHtml(x,'lang','bpu')).join(''):''}
-    ${!total?`<div class="al as" style="margin-bottom:0;">✅ 內容檢核通過：未發現無法作答、重複或用語不當之處。</div>`:''}`;
+    ${!total?`<div class="al as">✅ 內容檢核通過：未發現無法作答、重複或用語不當之處。</div>`:''}
+    ${dSum>0?`<div class="vsec-t">📊 難易度分析</div>
+      <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--g100);">
+        ${dE?`<div style="width:${dPct(dE)}%;background:#6ee7b7;"></div>`:''}
+        ${dM?`<div style="width:${dPct(dM)}%;background:#fde68a;"></div>`:''}
+        ${dH?`<div style="width:${dPct(dH)}%;background:#fca5a5;"></div>`:''}
+      </div>
+      <div style="display:flex;gap:12px;font-size:.74rem;color:var(--g600);margin-top:4px;">
+        <span>🟢 易 ${dPct(dE)}%</span><span>🟡 中 ${dPct(dM)}%</span><span>🔴 難 ${dPct(dH)}%</span>
+      </div>
+      ${r.difficulty?.comment?`<div style="font-size:.8rem;color:var(--g600);margin-top:5px;line-height:1.6;">${esc(r.difficulty.comment)}</div>`:''}`:''}
+    ${adv.length?`<div class="vsec-t">🧑‍🏫 給老師的命題建議</div>
+      <div style="background:#f0fdf4;border-left:4px solid var(--ok);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">
+        ${adv.map((a,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:5px;':''}"><span style="flex-shrink:0;">💡</span><span>${esc(a)}</span></div>`).join('')}
+      </div>`:''}`;
   area.appendChild(div);
   div.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -1466,6 +1501,15 @@ function showCls(id){
     <div style="display:flex;flex-wrap:wrap;gap:6px;">${sortedMC.map(([m,c])=>
       `<span class="bdg br2" style="cursor:pointer;padding:5px 10px;font-size:.76rem;"
         onclick="goRem('${exam.subject}','${m.replace(/'/g,"\\'")}')">${esc(m)} (${c}人)</span>`).join('')}</div></div>`:''}
+  <div class="card"><div class="ct">📉 逐題答錯率與難易分析</div>${qStatsTable(qStats(subs),subs.length)}</div>
+  <div class="card"><div class="ct">🧑‍🏫 AI 教師分析報告（質性＋量化）</div>
+    <div class="al ai" style="font-size:.79rem;">綜合全班批改數據，AI 產出錯誤內容與難易度的<strong>量化＋質性分析</strong>，指出<strong>學生迷思概念</strong>與<strong>教學端（老師）可能的迷思或盲點</strong>，並給出教學調整建議。</div>
+    <div class="btn-row">
+      <button class="btn bp" onclick="genClassReport('${id}')">🤖 生成分析報告</button>
+      <button class="btn bs" onclick="genClassRem('${id}')">💡 依集體錯誤生成補救題</button>
+    </div>
+    <div id="clsAIReport" style="margin-top:10px;"></div>
+  </div>
   <div class="card"><div class="ct">👥 學生清單（${subs.length}人）</div>
     ${subs.slice().sort((a,b)=>b.percentage-a.percentage).map(s=>`<div class="sr">
       <div><div style="font-weight:600;font-size:.87rem;">${s.seatNo?s.seatNo+'. ':''}${esc(s.studentName)}</div>
@@ -1502,6 +1546,131 @@ function showCls(id){
   },80);
 }
 function clearClsSubs(id){if(!confirm('確定清除？'))return;DB.set('submissions',DB.get('submissions',[]).filter(s=>s.examId!==id));showCls(id);}
+
+/* ══════════ 班級量化統計＋AI 教師分析報告 ══════════ */
+function qStats(subs){
+  const n=subs.length,cnt={};let maxQ=0;
+  subs.forEach(s=>{
+    maxQ=Math.max(maxQ,Number(s.totalQuestions)||0);
+    (s.wrongQuestions||[]).forEach(q=>{const k=String(q);cnt[k]=(cnt[k]||0)+1;});
+  });
+  const qs=new Set(Object.keys(cnt));
+  if(maxQ&&maxQ<=60)for(let i=1;i<=maxQ;i++)qs.add(String(i));
+  return [...qs].map(q=>{
+    const w=cnt[q]||0,rate=n?w/n:0;
+    return {q,w,rate,band:rate<=.25?'易':rate<=.6?'中':'難'};
+  }).sort((a,b)=>b.rate-a.rate||((parseInt(a.q)||0)-(parseInt(b.q)||0)));
+}
+function qStatsTable(stats,n){
+  if(!stats.some(s=>s.w>0))return '<div class="empty" style="padding:12px;">🎉 沒有任何答錯題目記錄</div>';
+  return `<div style="max-height:320px;overflow:auto;"><table class="hist-table">
+    <thead><tr><th>題號</th><th>答錯人數</th><th>答錯率</th><th>難易判定</th></tr></thead>
+    <tbody>${stats.map(s=>`<tr>
+      <td style="font-weight:600;white-space:nowrap;">第 ${esc(s.q)} 題</td>
+      <td>${s.w}/${n}</td>
+      <td><div style="display:flex;align-items:center;gap:6px;">
+        <div style="flex:1;max-width:120px;height:6px;background:var(--g100);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${Math.round(s.rate*100)}%;background:${s.rate>.6?'#ef4444':s.rate>.25?'#f59e0b':'#10b981'};"></div></div>
+        <span style="font-size:.75rem;">${Math.round(s.rate*100)}%</span></div></td>
+      <td><span class="bdg ${s.band==='易'?'bg':s.band==='中'?'by':'br2'}">${s.band}</span></td>
+    </tr>`).join('')}</tbody></table></div>
+  <div style="font-size:.72rem;color:var(--g400);margin-top:5px;">難易判定依全班答錯率：≤25% 易 · 25–60% 中 · &gt;60% 難（依實際作答表現，非命題預設）</div>`;
+}
+function classAggregates(examId){
+  const exam=DB.get('exams',[]).find(e=>e.id===examId);
+  const subs=DB.get('submissions',[]).filter(s=>s.examId===examId);
+  if(!exam||!subs.length)return null;
+  const n=subs.length,scores=subs.map(s=>s.percentage);
+  const mcFreq={};subs.forEach(s=>(s.misconceptions||[]).forEach(m=>{mcFreq[m]=(mcFreq[m]||0)+1;}));
+  const etFreq={};subs.forEach(s=>(s.errorDetails||[]).forEach(d=>{if(d.errorType)etFreq[d.errorType]=(etFreq[d.errorType]||0)+1;}));
+  return {exam,subs,n,
+    avg:Math.round(scores.reduce((a,b)=>a+b,0)/n),
+    passRate:Math.round(scores.filter(s=>s>=60).length/n*100),
+    max:Math.max(...scores),min:Math.min(...scores),
+    stats:qStats(subs),
+    mcTop:Object.entries(mcFreq).sort((a,b)=>b[1]-a[1]),
+    etTop:Object.entries(etFreq).sort((a,b)=>b[1]-a[1])};
+}
+async function genClassReport(examId){
+  const agg=classAggregates(examId);
+  if(!agg){alert('尚無批改記錄');return;}
+  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini 或 OpenAI API Key');return;}
+  const area=document.getElementById('clsAIReport');
+  area.innerHTML='<div class="ld"><div class="sp"></div>AI 分析全班數據中…</div>';
+  const {exam,n,avg,passRate,max,min,stats,mcTop,etTop}=agg;
+  const wrongStats=stats.filter(s=>s.w>0);
+  const p=`你是台灣${exam.grade}${sl(exam.subject)}教學分析專家。以下是「${exam.name}」全班 ${n} 位學生的批改統計數據，請產出給老師的分析報告。
+
+【量化數據】
+- 平均 ${avg} 分、及格率 ${passRate}%、最高 ${max} 分、最低 ${min} 分
+- 逐題答錯率：${wrongStats.length?wrongStats.map(s=>`第${s.q}題 ${s.w}/${n} 人答錯(${Math.round(s.rate*100)}%)`).join('、'):'無答錯記錄'}
+- 學生迷思概念統計：${mcTop.length?mcTop.map(([m,c])=>`${m}(${c}人)`).join('、'):'無'}
+- 錯誤類型統計：${etTop.length?etTop.map(([t,c])=>`${t}(${c}次)`).join('、'):'無'}
+
+請提供：
+1. 量化分析：從數據指出重點發現（高答錯率題目、實際難易分佈、分數分佈的意涵、鑑別度）
+2. 質性分析：推論錯誤內容背後的學習原因
+3. 學生迷思概念：歸納全班主要迷思與受影響範圍
+4. 教師（教學端）可能的迷思或盲點：從集體錯誤反推教學或命題上可能的問題，例如某概念教學時間不足、教學順序不當、例題類型單一、題目設計或難易配置失衡等，語氣客觀委婉
+5. 給老師的建議：具體可行的教學調整與補救優先順序
+
+只回傳 JSON（不要 markdown）：
+{
+  "quantitative": ["量化發現1","量化發現2"],
+  "qualitative": ["質性分析1","質性分析2"],
+  "studentMisconceptions": [{"concept":"迷思概念","scope":"約X成學生","analysis":"成因分析"}],
+  "teacherMisconceptions": ["教學端可能的迷思或盲點1"],
+  "difficultyAnalysis": "整體難易度與鑑別度評論",
+  "suggestions": ["給老師的教學調整建議1"],
+  "remediationFocus": [{"misconception":"優先補救的迷思概念","reason":"優先原因"}]
+}`;
+  try{
+    const r=parseAIJson(await AI.call(p));
+    const list=(arr,icon)=>Array.isArray(arr)&&arr.length?arr.map((x,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:5px;':''}"><span style="flex-shrink:0;">${icon}</span><span>${esc(typeof x==='string'?x:JSON.stringify(x))}</span></div>`).join(''):'';
+    const smc=Array.isArray(r.studentMisconceptions)?r.studentMisconceptions:[];
+    const tmc=Array.isArray(r.teacherMisconceptions)?r.teacherMisconceptions:[];
+    const rf=Array.isArray(r.remediationFocus)?r.remediationFocus:[];
+    area.innerHTML=`
+      ${Array.isArray(r.quantitative)&&r.quantitative.length?`<div class="vsec-t">📊 量化分析</div>
+        <div style="background:#eff6ff;border-left:4px solid var(--pri);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">${list(r.quantitative,'▪')}</div>`:''}
+      ${Array.isArray(r.qualitative)&&r.qualitative.length?`<div class="vsec-t">📝 質性分析</div>
+        <div style="background:var(--g50);border-left:4px solid var(--g400);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">${list(r.qualitative,'▪')}</div>`:''}
+      ${smc.length?`<div class="vsec-t">🧠 學生迷思概念</div>${smc.map(m=>`<div class="vissue">
+        <strong>${esc(m.concept||'')}</strong>${m.scope?` <span class="bdg br2" style="font-size:.64rem;">${esc(m.scope)}</span>`:''}
+        <div style="margin-top:2px;">${esc(m.analysis||'')}</div></div>`).join('')}`:''}
+      ${tmc.length?`<div class="vsec-t">🧑‍🏫 教學端可能的迷思／盲點</div>${tmc.map(t=>`<div class="vissue lang">${esc(t)}</div>`).join('')}`:''}
+      ${r.difficultyAnalysis?`<div class="vsec-t">📈 難易度與鑑別度</div>
+        <div class="al aw" style="margin-bottom:0;font-size:.82rem;">${esc(r.difficultyAnalysis)}</div>`:''}
+      ${Array.isArray(r.suggestions)&&r.suggestions.length?`<div class="vsec-t">💡 給老師的建議</div>
+        <div style="background:#f0fdf4;border-left:4px solid var(--ok);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">${list(r.suggestions,'💡')}</div>`:''}
+      ${rf.length?`<div class="vsec-t">🎯 優先補救重點</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${rf.map(f=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--g50);border:1.5px solid var(--g200);border-radius:8px;padding:8px 11px;">
+            <div style="flex:1;"><div style="font-size:.84rem;font-weight:600;">${esc(f.misconception||'')}</div>
+              <div style="font-size:.72rem;color:var(--g400);margin-top:2px;">${esc(f.reason||'')}</div></div>
+            <button class="btn bp bsm" style="flex-shrink:0;" onclick="goRem('${exam.subject}','${String(f.misconception||'').replace(/'/g,"\\'")}')">🤖 生成題目</button>
+          </div>`).join('')}</div>`:''}
+      <div style="font-size:.7rem;color:var(--g400);margin-top:8px;">由 ${esc(AI.lastUsed)} 產生 · AI 分析僅供參考，請以教師專業判斷為準</div>`;
+  }catch(e){area.innerHTML=`<div class="al ae">❌ ${esc(e.message)}</div>`;}
+}
+function genClassRem(examId){
+  const agg=classAggregates(examId);
+  if(!agg){alert('尚無批改記錄');return;}
+  const {exam,n,stats,mcTop}=agg;
+  const wrongStats=stats.filter(s=>s.w>0).slice(0,8);
+  if(!wrongStats.length&&!mcTop.length){alert('目前沒有集體錯誤資料（無答錯題目與迷思概念記錄）');return;}
+  const subjEl=document.getElementById('remSubj');if(subjEl)subjEl.value=exam.subject;
+  const gradeEl=document.getElementById('remGrade');if(gradeEl&&exam.grade)gradeEl.value=exam.grade;
+  document.getElementById('remMC').value=mcTop[0]?.[0]||'全班共同弱點';
+  document.getElementById('remExtra').value=
+    `針對「${exam.name}」全班 ${n} 人的集體錯誤出題：`+
+    (wrongStats.length?`高答錯率題目：${wrongStats.map(s=>`第${s.q}題(${Math.round(s.rate*100)}%)`).join('、')}。`:'')+
+    (mcTop.length?`主要迷思概念：${mcTop.slice(0,5).map(([m,c])=>`${m}(${c}人)`).join('、')}。`:'')+
+    `請讓題目涵蓋這些共同弱點，由易到難編排，選項設計要能誘出並診斷上述迷思。`;
+  showTab('rem');updateRemS();renderRemAuto();
+  document.getElementById('remResult').scrollIntoView({behavior:'smooth',block:'start'});
+  setTimeout(genRem,100);
+}
 
 function renderDashboard(){
   const exams=DB.get('exams',[]),subs=DB.get('submissions',[]);
