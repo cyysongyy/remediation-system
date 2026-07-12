@@ -643,13 +643,20 @@ const DB={
 // ★ AI 回應 JSON 容錯解析（處理 markdown 包裝、多餘文字）
 function parseAIJson(raw){
   if(!raw)throw new Error('AI 未回傳內容');
+  // 先嘗試直接解析（Gemini responseMimeType / OpenAI response_format 已強制純 JSON）
+  try{return JSON.parse(raw.trim());}catch{}
   // 移除 ```json ... ``` 或 ``` ... ```
   let cleaned=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-  // 取第一個 { ... } 區塊
+  // 取第一個 { 到最後一個 } 區塊
   const m=cleaned.match(/\{[\s\S]*\}/);
-  if(!m)throw new Error('AI 回應格式錯誤（找不到 JSON）');
+  if(!m){
+    const hasOpenBrace=cleaned.includes('{');
+    throw new Error(hasOpenBrace
+      ?'AI 回應被截斷（JSON 未結束），請重新檢測，或改用解析度較低的照片'
+      :'AI 回應格式錯誤（找不到 JSON）：'+cleaned.slice(0,120));
+  }
   try{return JSON.parse(m[0]);}
-  catch(e){throw new Error('AI 回應 JSON 解析失敗：'+e.message);}
+  catch(e){throw new Error('AI 回應 JSON 解析失敗（可能被截斷），請重新檢測：'+e.message);}
 }
 const MCL={
   math:['四則運算順序錯誤','分數加減通分概念','小數點位置混淆','比例與比值混淆','幾何面積公式混淆','文字題理解','負數大小概念','因數倍數混淆','方程式移項錯誤','百分率換算'],
@@ -680,17 +687,24 @@ const AI={
         if(img)parts.push({inline_data:{mime_type:'image/jpeg',data:img}});
         const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${gk}`,
           {method:'POST',headers:{'Content-Type':'application/json'},
-           body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:4096}})});
+           body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:8192,responseMimeType:'application/json'}})});
         const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
-        return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        const cand=d.candidates?.[0];
+        if(cand?.finishReason==='MAX_TOKENS'&&!cand?.content?.parts?.[0]?.text){
+          throw new Error('Gemini 回應被截斷且無內容，請縮小圖片範圍或分區塊拍攝後再試');
+        }
+        return cand?.content?.parts?.[0]?.text||'';
       }};
     const openai={id:'openai',name:'OpenAI',
       async call(p,img){
         const c=img?[{type:'text',text:p},{type:'image_url',image_url:{url:`data:image/jpeg;base64,${img}`}}]:[{type:'text',text:p}];
         const r=await fetch('https://api.openai.com/v1/chat/completions',
           {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${ok}`},
-           body:JSON.stringify({model:om,messages:[{role:'user',content:c}],max_tokens:4096})});
+           body:JSON.stringify({model:om,messages:[{role:'user',content:c}],max_tokens:8192,response_format:{type:'json_object'}})});
         const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`OpenAI ${r.status}`);
+        if(d.choices?.[0]?.finish_reason==='length'&&!d.choices?.[0]?.message?.content){
+          throw new Error('OpenAI 回應被截斷且無內容，請縮小圖片範圍或分區塊拍攝後再試');
+        }
         return d.choices?.[0]?.message?.content||'';
       }};
     const arr=[];
