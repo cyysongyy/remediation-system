@@ -641,22 +641,41 @@ const DB={
 };
 
 // ★ AI 回應 JSON 容錯解析（處理 markdown 包裝、多餘文字）
+// 從第一個 { 開始，正確追蹤字串／跳脫字元，找出第一個「完整閉合」的 JSON 物件。
+// 若掃到結尾都沒有閉合，代表回應真的被截斷（比單純比對最後一個 } 更準確）。
+function extractBalancedJsonObject(text){
+  const start=text.indexOf('{');
+  if(start===-1)return null;
+  let depth=0,inStr=false,esc=false;
+  for(let i=start;i<text.length;i++){
+    const ch=text[i];
+    if(inStr){
+      if(esc)esc=false;
+      else if(ch==='\\')esc=true;
+      else if(ch==='"')inStr=false;
+    }else{
+      if(ch==='"')inStr=true;
+      else if(ch==='{')depth++;
+      else if(ch==='}'){depth--;if(depth===0)return text.slice(start,i+1);}
+    }
+  }
+  return null; // 未閉合 = 被截斷
+}
 function parseAIJson(raw){
   if(!raw)throw new Error('AI 未回傳內容');
   // 先嘗試直接解析（Gemini responseMimeType / OpenAI response_format 已強制純 JSON）
   try{return JSON.parse(raw.trim());}catch{}
   // 移除 ```json ... ``` 或 ``` ... ```
   let cleaned=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-  // 取第一個 { 到最後一個 } 區塊
-  const m=cleaned.match(/\{[\s\S]*\}/);
-  if(!m){
+  const obj=extractBalancedJsonObject(cleaned);
+  if(!obj){
     const hasOpenBrace=cleaned.includes('{');
     throw new Error(hasOpenBrace
-      ?'AI 回應被截斷（JSON 未結束），請重新檢測，或改用解析度較低的照片'
+      ?'AI 回應被截斷（JSON 未結束），請重新檢測；若持續發生，可嘗試分開檢測每一頁'
       :'AI 回應格式錯誤（找不到 JSON）：'+cleaned.slice(0,120));
   }
-  try{return JSON.parse(m[0]);}
-  catch(e){throw new Error('AI 回應 JSON 解析失敗（可能被截斷），請重新檢測：'+e.message);}
+  try{return JSON.parse(obj);}
+  catch(e){throw new Error('AI 回應 JSON 語法錯誤，請重新檢測：'+e.message);}
 }
 const MCL={
   math:['四則運算順序錯誤','分數加減通分概念','小數點位置混淆','比例與比值混淆','幾何面積公式混淆','文字題理解','負數大小概念','因數倍數混淆','方程式移項錯誤','百分率換算'],
@@ -688,7 +707,7 @@ const AI={
         imgs.forEach(im=>parts.push({inline_data:{mime_type:'image/jpeg',data:im}}));
         const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${gk}`,
           {method:'POST',headers:{'Content-Type':'application/json'},
-           body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:8192,responseMimeType:'application/json'}})});
+           body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:16000,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}})});
         const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
         const cand=d.candidates?.[0];
         if(cand?.finishReason==='MAX_TOKENS'&&!cand?.content?.parts?.[0]?.text){
@@ -1230,7 +1249,7 @@ ${roster}
     ));
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${gk}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:4096}})});
+       body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.1,maxOutputTokens:16000,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}})});
     const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
     const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
     return parseAIJson(raw);
@@ -1245,7 +1264,7 @@ ${roster}
     });
     const r=await fetch('https://api.openai.com/v1/chat/completions',
       {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${ok}`},
-       body:JSON.stringify({model:om,messages:[{role:'user',content}],max_tokens:4096})});
+       body:JSON.stringify({model:om,messages:[{role:'user',content}],max_tokens:8192,response_format:{type:'json_object'}})});
     const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`OpenAI ${r.status}`);
     const raw=d.choices?.[0]?.message?.content||'';
     return parseAIJson(raw);
@@ -1470,7 +1489,8 @@ async function analyzeBlankPaperGroup(group){
   "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置是否恰當的評論"},
   "teacherAdvice": ["給老師的命題建議1", "建議2"]
 }
-若某類別沒有發現問題，該欄位回傳空陣列 []。`;
+若某類別沒有發現問題，該欄位回傳空陣列 []。
+【重要】若問題數量很多，contentIssues、duplicates、inappropriate 三個陣列各自最多列出 8 筆最重要的即可，其餘可在 summary 註明「還有其他較輕微的問題未一一列出」；務必輸出語法正確、完整閉合的 JSON，字串中的换行請用 \\n、雙引號請用 \\" 跳脫。`;
   const raw=await AI.call(prompt,group.map(f=>f.b64));
   return parseAIJson(raw);
 }
