@@ -272,7 +272,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
       <div class="ct">🔍 空白考卷 AI 檢核</div>
       <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 檢查<strong>空白考卷</strong>是否有問題：<br>
         ❌ 題目錯誤（無法算出答案、條件矛盾、選項無正確答案）　🔁 重複的題目或選項　🚫 用語不當（性暗示、不雅俚語、偏頗的政治意識形態）<br>
-        可一次上傳<strong>多張照片</strong>，每張視為一份獨立考卷，AI 會逐張檢測並自動辨識<strong>年級與科目</strong>。</div>
+        可一次上傳<strong>多張照片</strong>，每張視為一份獨立考卷，AI 會逐張檢測並自動辨識<strong>年級與科目</strong>。<br>
+        ☁️ 已設定雲端後台時，考卷照片會自動存入 Google Drive，檢核結果與建議存入試算表「考卷檢核」工作表。</div>
       <div class="bup" id="vupZone"
         ondrop="handleVDrop(event)" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
         <input type="file" id="vInput" multiple accept="image/*" onchange="handleVFiles(event)"/>
@@ -622,7 +623,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
       <div class="ct">❓ 常見問題</div>
       <details style="border-bottom:1px solid var(--g100);padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">AI 沒有答案卷怎麼批改？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">AI 會根據題目內容與常見教學知識推斷正確答案。建議上傳答案卷照片可大幅提升準確度。</div></details>
       <details style="border-bottom:1px solid var(--g100);padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">一次可以上傳幾張照片？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">理論上不限張數，但建議每批不超過 20 張，避免等待時間過長。</div></details>
-      <details style="border-bottom:1px solid var(--g100);padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">資料存在哪裡？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">批改記錄預設存在本機瀏覽器（localStorage）。設定 GAS 後台後可同步至 Google 試算表。</div></details>
+      <details style="border-bottom:1px solid var(--g100);padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">資料存在哪裡？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">批改記錄預設存在本機瀏覽器（localStorage）。設定 GAS 後台後：批改記錄、檢核結果與老師建議同步至 Google 試算表；考卷照片（空白考卷、學生考卷、答案卷）自動存入你的 Google Drive「Remedial System 考卷照片」資料夾，試算表中保留連結。</div></details>
       <details style="border-bottom:1px solid var(--g100);padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">API Key 安全嗎？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">API Key 只存在你自己的瀏覽器，不會傳送給任何第三方，只用於直接呼叫 Google / OpenAI API。</div></details>
       <details style="padding:9px 0;"><summary style="font-weight:700;font-size:.87rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;">手機可以用嗎？<span style="color:var(--g400);">▾</span></summary><div style="font-size:.82rem;color:var(--g600);margin-top:6px;line-height:1.7;">可以，支援手機瀏覽器，相機功能會調用後置鏡頭直接拍照。</div></details>
     </div>
@@ -1140,7 +1141,7 @@ async function startBatchGrade(){
         fileName:group.map(f=>f.name).join('、'),
         pageCount:group.length};
       const subs=DB.get('submissions',[]);subs.push(sub);DB.set('submissions',subs);
-      if(DB.get('gasUrl',''))syncToGAS(sub);
+      if(DB.get('gasUrl',''))syncToGAS(sub,group.map(f=>({name:f.name,b64:f.b64})));
       appendResult(sub,exam,result);
     }catch(e){
       group.forEach(f=>{const item=batchItems.find(x=>x.id===f.id);if(item){item.status='error';item.error=e.message;}});
@@ -1350,6 +1351,7 @@ async function startValidate(){
       const r=await analyzeBlankPaper(f);
       f.status='done';
       appendVResult(f,r,done);
+      if(DB.get('gasUrl',''))saveValidationToGAS(f,r);
     }catch(e){
       f.status='error';
       appendVError(f,e,done);
@@ -1389,6 +1391,23 @@ async function analyzeBlankPaper(f){
 若某類別沒有發現問題，該欄位回傳空陣列 []。`;
   const raw=await AI.call(prompt,f.b64);
   return parseAIJson(raw);
+}
+
+async function saveValidationToGAS(f,r){
+  try{
+    await gasPost({action:'saveValidation',
+      validation:{
+        id:f.id,checkedAt:new Date().toLocaleString('zh-TW'),
+        grade:r.grade||'',subject:r.subject||'',examTitle:r.examTitle||'',
+        summary:r.summary||'',
+        issueCount:(r.contentIssues?.length||0)+(r.duplicates?.length||0)+(r.inappropriate?.length||0),
+        contentIssues:r.contentIssues||[],duplicates:r.duplicates||[],
+        inappropriate:r.inappropriate||[],
+        difficulty:r.difficulty||null,teacherAdvice:r.teacherAdvice||[],
+        fileName:f.name},
+      images:[{name:f.name,b64:f.b64}]});
+    setSyncStatus('synced');
+  }catch{setSyncStatus('error');}
 }
 
 function vSep(idx){
@@ -1849,7 +1868,7 @@ function setSyncStatus(s){
   const b=document.getElementById('gasStatusBadge');
   if(b){b.textContent=s==='synced'?'✅ 已連線':s==='error'?'❌ 失敗':'⭕ 未設定';}
 }
-async function syncToGAS(sub){try{await gasPost({action:'saveSubmission',submission:sub});setSyncStatus('synced');}catch{setSyncStatus('error');}}
+async function syncToGAS(sub,images){try{await gasPost({action:'saveSubmission',submission:sub,images:images||[]});setSyncStatus('synced');}catch{setSyncStatus('error');}}
 async function pullFromGAS(){
   const url=DB.get('gasUrl','');if(!url){alert('請先設定 GAS 網址');return;}
   setSyncStatus('syncing');
