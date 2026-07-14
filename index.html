@@ -380,19 +380,28 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
               <option>七年級</option><option>八年級</option><option>九年級</option></select></div>
         </div>
         <div class="fg" style="margin-top:10px;">
-          <label class="fl">📋 答案卷照片（讓 AI 知道正確答案，選填）</label>
-          <div class="al ai" style="font-size:.76rem;margin-bottom:6px;">上傳老師版答案卷照片，AI 會自動比對學生作答。未上傳則 AI 僅分析答題模式。</div>
+          <label class="fl">📋 答案卷（讓 AI 知道正確答案，選填）</label>
+          <div class="al ai" style="font-size:.76rem;margin-bottom:6px;">上傳老師版答案卷，AI 會自動比對學生作答。可上傳照片，或直接上傳 <strong>Word（.docx）或 PDF</strong> 檔案（系統會自動擷取文字內容）。未上傳則 AI 僅分析答題模式。</div>
           <div id="akArea">
             <div style="display:flex;gap:7px;flex-wrap:wrap;">
               <button class="btn bo bsm" onclick="openCamForKey()">📷 拍答案卷</button>
-              <button class="btn bo bsm" onclick="document.getElementById('akInput').click()">🖼️ 選擇圖片</button>
+              <button class="btn bo bsm" onclick="document.getElementById('akInput').click()">🖼️ 選擇圖片/檔案</button>
             </div>
-            <input type="file" id="akInput" accept="image/*" style="display:none;" onchange="loadAnswerKey(event)"/>
+            <input type="file" id="akInput" accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="loadAnswerKey(event)"/>
           </div>
           <div id="akPreview" style="display:none;" class="ak-prev">
             <img id="akImg" src=""/>
             <span class="ak-badge">✅ 答案卷</span>
             <button class="ak-del" onclick="clearAnswerKey()">✕</button>
+          </div>
+          <div id="akDocPreview" style="display:none;margin-top:6px;padding:9px 11px;border:1.5px solid var(--g200);border-radius:8px;background:var(--g50);font-size:.78rem;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span id="akDocIcon">📄</span>
+              <span id="akDocName" style="font-weight:700;color:var(--g600);flex:1;word-break:break-all;"></span>
+              <span class="ak-badge" style="position:static;">✅ 答案卷</span>
+              <button class="btn bo bsm" style="padding:2px 8px;" onclick="clearAnswerKey()">✕</button>
+            </div>
+            <div id="akDocStatus" style="font-size:.72rem;color:var(--g400);margin-top:4px;"></div>
           </div>
         </div>
         <div class="fg">
@@ -695,6 +704,7 @@ let currExam=null, clsExam=null;
 let batchFiles=[];   // legacy compat
 let batchItems=[];   // new: [{type:'file',...}|{type:'divider',...}]
 let answerKeyB64=null;
+let answerKeyText=null;
 let rosterData=[];
 let camStream=null, camFacing='environment', camTarget='batch';
 let dashC={};
@@ -783,7 +793,7 @@ function retakePhoto(){
 function addCapturedToBatch(){
   const dataUrl=document.getElementById('camCapturedImg').src;
   if(!dataUrl)return;
-  if(camTarget==='key'){answerKeyB64=dataUrl.split(',')[1];showAnswerKey(dataUrl);}
+  if(camTarget==='key'){answerKeyText=null;answerKeyB64=dataUrl.split(',')[1];showAnswerKey(dataUrl);}
   else if(camTarget==='validate'){const name='拍照_'+new Date().toTimeString().slice(0,5)+'.jpg';addVFile(name,dataUrl.split(',')[1],dataUrl);}
   else{const name='拍照_'+new Date().toTimeString().slice(0,5)+'.jpg';addFileToBatch(name,dataUrl.split(',')[1],dataUrl);}
   closeCamera();
@@ -801,15 +811,59 @@ function closeCamera(){
 
 function loadAnswerKey(e){
   const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>{answerKeyB64=ev.target.result.split(',')[1];showAnswerKey(ev.target.result);};
-  r.readAsDataURL(f);
+  const isImg=f.type.startsWith('image/');
+  const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+  const isDocx=f.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document'||/\.docx$/i.test(f.name);
+  const isOldDoc=/\.doc$/i.test(f.name)&&!isDocx;
+  if(isImg){
+    const r=new FileReader();
+    r.onload=ev=>{answerKeyText=null;answerKeyB64=ev.target.result.split(',')[1];showAnswerKey(ev.target.result);};
+    r.readAsDataURL(f);
+  } else if(isPdf||isDocx){
+    answerKeyB64=null;answerKeyText=null;
+    showAnswerKeyDoc(f.name,isPdf?'pdf':'docx','擷取文字中…');
+    const r=new FileReader();
+    r.onload=async ev=>{
+      try{
+        const text=isPdf?await extractPdfText(ev.target.result):await extractDocxText(ev.target.result);
+        const enough=isPdf?(text&&text.replace(/[-第頁\s]/g,'').length>=10):(text&&text.length>=10);
+        if(!enough){
+          answerKeyText=null;
+          showAnswerKeyDoc(f.name,isPdf?'pdf':'docx',isPdf?'⚠️ PDF 內無法擷取到文字（可能是掃描影像），請改用照片上傳':'⚠️ Word 文件內無法擷取到文字內容',true);
+        } else {
+          answerKeyText=text;
+          showAnswerKeyDoc(f.name,isPdf?'pdf':'docx',`✅ 已擷取 ${text.length} 字，將作為批改對照`);
+        }
+      }catch(err){
+        answerKeyText=null;
+        showAnswerKeyDoc(f.name,isPdf?'pdf':'docx',`⚠️ 檔案解析失敗：${err.message||'未知錯誤'}`,true);
+      }
+    };
+    r.onerror=()=>{answerKeyText=null;showAnswerKeyDoc(f.name,isPdf?'pdf':'docx','⚠️ 檔案讀取失敗',true);};
+    r.readAsArrayBuffer(f);
+  } else if(isOldDoc){
+    alert('不支援舊版 .doc 格式，請另存為 .docx 後再上傳');
+    e.target.value='';
+  } else {
+    alert('不支援的檔案類型，請上傳圖片、PDF 或 Word（.docx）');
+    e.target.value='';
+  }
 }
 function showAnswerKey(dataUrl){
   document.getElementById('akImg').src=dataUrl;
   document.getElementById('akPreview').style.display='block';
+  document.getElementById('akDocPreview').style.display='none';
 }
-function clearAnswerKey(){answerKeyB64=null;document.getElementById('akPreview').style.display='none';document.getElementById('akInput').value='';}
+function showAnswerKeyDoc(name,kind,status,isError){
+  document.getElementById('akPreview').style.display='none';
+  document.getElementById('akDocIcon').textContent=kind==='pdf'?'📕':'📘';
+  document.getElementById('akDocName').textContent=name;
+  const st=document.getElementById('akDocStatus');
+  st.textContent=status;
+  st.style.color=isError?'var(--red,#dc2626)':'var(--g400)';
+  document.getElementById('akDocPreview').style.display='block';
+}
+function clearAnswerKey(){answerKeyB64=null;answerKeyText=null;document.getElementById('akPreview').style.display='none';document.getElementById('akDocPreview').style.display='none';document.getElementById('akInput').value='';}
 
 function createExam(){
   const name=document.getElementById('newExamName').value.trim();
@@ -820,10 +874,11 @@ function createExam(){
   const sem=document.getElementById('newExamSem').value;
   const roster=rosterData.filter(r=>r.seat||r.name).map(r=>({seat:r.seat.trim(),name:r.name.trim()}));
   const exam={id:'e'+Date.now(),name,subject,grade,year,sem,roster,
-    answerKeyB64:answerKeyB64||null,createdAt:new Date().toLocaleDateString('zh-TW')};
+    answerKeyB64:answerKeyB64||null,answerKeyText:answerKeyText||null,createdAt:new Date().toLocaleDateString('zh-TW')};
   const exams=DB.get('exams',[]); exams.unshift(exam); DB.set('exams',exams);
   document.getElementById('newExamName').value='';
   answerKeyB64=null;
+  answerKeyText=null;
   document.getElementById('akPreview').style.display='none';
   rosterData=[];renderRosterTable();
   clearAnswerKey();
@@ -837,7 +892,7 @@ function renderExamList2(){
   if(!exams.length){el.innerHTML='<div class="empty" style="padding:14px;"><div>尚無考卷，請先建立</div></div>';return;}
   el.innerHTML=exams.map(e=>`<div class="ec ${currExam===e.id?'sel':''}" onclick="selectExam('${e.id}')">
     <div><div style="font-weight:700;font-size:.87rem;">${esc(e.name)}</div>
-      <div style="font-size:.74rem;color:var(--g400);">${e.year?e.year+'學年'+e.sem+'學期 · ':''}${e.grade} · ${sl(e.subject)} · ${e.createdAt}${e.answerKeyB64?' · 📋有答案卷':''}</div></div>
+      <div style="font-size:.74rem;color:var(--g400);">${e.year?e.year+'學年'+e.sem+'學期 · ':''}${e.grade} · ${sl(e.subject)} · ${e.createdAt}${(e.answerKeyB64||e.answerKeyText)?' · 📋有答案卷':''}</div></div>
     <div style="display:flex;align-items:center;gap:6px;">
       <span class="bdg bb">${sl(e.subject)}</span>
       <button class="btn bd bsm" onclick="event.stopPropagation();delExam('${e.id}')">🗑</button>
@@ -1202,9 +1257,12 @@ async function analyzeStudentGroup(pages,exam){
   const roster=exam.roster?.length?`班級名單：${exam.roster.map(r=>r.seat?(r.seat+'.'+r.name):r.name).join('、')}`:'';
   const pageDesc=pages.length>1?`這份考卷共 ${pages.length} 頁（第1頁為首頁，請綜合所有頁面評分）`:'這份考卷共 1 頁';
 
+  const answerKeyHint=exam.answerKeyText
+    ?`以下是老師版答案卷的文字內容，請以此為標準答案批改：\n---答案卷開始---\n${exam.answerKeyText}\n---答案卷結束---`
+    :(exam.answerKeyB64?'我已提供答案卷作為對照，請以答案卷為標準批改。':'請根據題目內容判斷正確答案並批改。');
   let prompt=`你是${sl(exam.subject)}考卷批改助理（台灣${exam.grade}）。
 ${pageDesc}。請分析這位學生的考卷圖片（可能有多頁）。
-${exam.answerKeyB64?'我已提供答案卷作為對照，請以答案卷為標準批改。':'請根據題目內容判斷正確答案並批改。'}
+${answerKeyHint}
 ${roster}
 
 請提取以下資訊（若看不清楚請合理推測）：
