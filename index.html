@@ -116,6 +116,9 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
 .student-divider-del:hover{background:#fee2e2;}
 .pcard{border-radius:10px;overflow:hidden;border:2px solid var(--g200);position:relative;background:var(--g100);}
 .pcard img{width:100%;height:90px;object-fit:cover;display:block;}
+.pcard .pdoc-icon{width:100%;height:90px;display:flex;align-items:center;justify-content:center;font-size:2rem;background:var(--g100);}
+.pcard.extracting{border-color:var(--warn);}
+.pcard.extracting .pstatus{background:rgba(217,119,6,.85);color:#fff;}
 .pcard .pname{font-size:.68rem;padding:4px 6px;color:var(--g700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pcard .pdel{position:absolute;top:3px;right:3px;background:rgba(239,68,68,.85);color:#fff;
   border:none;border-radius:50%;width:20px;height:20px;font-size:.7rem;cursor:pointer;line-height:20px;text-align:center;}
@@ -272,14 +275,15 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
       <div class="ct">🔍 空白考卷 AI 檢核</div>
       <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 檢查<strong>空白考卷</strong>是否有問題：<br>
         ❌ 題目錯誤（無法算出答案、條件矛盾、選項無正確答案）　🔁 重複的題目或選項　🚫 用語不當（性暗示、不雅俚語、偏頗的政治意識形態）<br>
-        可一次上傳<strong>多張照片</strong>，預設每張視為一份獨立考卷；若同一份考卷有<strong>多頁</strong>，可在照片之間加「分隔線」把它們圈成同一份，AI 會將整組頁面合併檢測並自動辨識<strong>年級與科目</strong>。</div>
+        可一次上傳<strong>多張照片</strong>，預設每張視為一份獨立考卷；若同一份考卷有<strong>多頁</strong>，可在照片之間加「分隔線」把它們圈成同一份，AI 會將整組頁面合併檢測並自動辨識<strong>年級與科目</strong>。<br>
+        除了照片，也可直接上傳 <strong>Word（.docx）或 PDF</strong> 檔案，系統會自動擷取文字內容送交 AI 檢測（PDF 若為掃描影像、無法擷取文字，請改用照片上傳）。</div>
       <div class="bup" id="vupZone"
         ondrop="handleVDrop(event)" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
-        <input type="file" id="vInput" multiple accept="image/*" onchange="handleVFiles(event)"/>
+        <input type="file" id="vInput" multiple accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="handleVFiles(event)"/>
         <div id="vupPH">
           <div class="bup-icon">🔍</div>
-          <div class="bup-label">拖放或點擊選取空白考卷照片</div>
-          <div class="bup-sub">可一次選取多張 · 同一份考卷的多頁可用分隔線圈成一組 · 支援 JPG · PNG</div>
+          <div class="bup-label">拖放或點擊選取空白考卷照片／Word／PDF</div>
+          <div class="bup-sub">可一次選取多張 · 同一份考卷的多頁可用分隔線圈成一組 · 支援 JPG · PNG · DOCX · PDF</div>
         </div>
       </div>
       <div class="btn-row" style="margin-top:10px;">
@@ -1316,6 +1320,49 @@ function appendError(file){
 /* ══════════ 空白考卷 AI 檢核 ══════════ */
 let vItems=[];   // [{type:'file',...}|{type:'divider',id,label}]
 
+// ── PDF / Word 文字擷取（延遲載入函式庫，只有真的上傳這類檔案時才載入）──
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector(`script[src="${src}"]`)){resolve();return;}
+    const s=document.createElement('script');
+    s.src=src;s.onload=()=>resolve();s.onerror=()=>reject(new Error('無法載入解析元件，請檢查網路連線'));
+    document.head.appendChild(s);
+  });
+}
+let _pdfjsReady=null;
+function ensurePdfJs(){
+  if(!_pdfjsReady){
+    _pdfjsReady=loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js').then(()=>{
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    });
+  }
+  return _pdfjsReady;
+}
+let _mammothReady=null;
+function ensureMammoth(){
+  if(!_mammothReady){
+    _mammothReady=loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.11.0/mammoth.browser.min.js');
+  }
+  return _mammothReady;
+}
+async function extractPdfText(arrayBuffer){
+  await ensurePdfJs();
+  const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    const pageText=content.items.map(it=>it.str).join(' ');
+    text+=`\n--- 第 ${i} 頁 ---\n${pageText}\n`;
+  }
+  return text.trim();
+}
+async function extractDocxText(arrayBuffer){
+  await ensureMammoth();
+  const result=await window.mammoth.extractRawText({arrayBuffer});
+  return (result.value||'').trim();
+}
+
 function handleVFiles(e){addVList(e.target.files);}
 function handleVDrop(e){
   e.preventDefault();document.getElementById('vupZone').classList.remove('drag');
@@ -1323,15 +1370,70 @@ function handleVDrop(e){
 }
 function addVList(files){
   [...files].forEach(f=>{
-    if(!f.type.startsWith('image/'))return;
-    const r=new FileReader();
-    r.onload=ev=>addVFile(f.name,ev.target.result.split(',')[1],ev.target.result);
-    r.readAsDataURL(f);
+    const isImg=f.type.startsWith('image/');
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    const isDocx=f.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document'||/\.docx$/i.test(f.name);
+    const isOldDoc=/\.doc$/i.test(f.name)&&!isDocx;
+    if(isImg){
+      const r=new FileReader();
+      r.onload=ev=>addVFile(f.name,ev.target.result.split(',')[1],ev.target.result);
+      r.readAsDataURL(f);
+    } else if(isPdf){
+      const id=addVDocPlaceholder(f.name,'pdf');
+      const r=new FileReader();
+      r.onload=async ev=>{
+        try{
+          const text=await extractPdfText(ev.target.result);
+          if(!text||text.replace(/[-第頁\s]/g,'').length<10){
+            finalizeVDocItem(id,null,'PDF 內無法擷取到文字（可能是掃描影像），請改用照片上傳');
+          } else {
+            finalizeVDocItem(id,text);
+          }
+        }catch(err){
+          finalizeVDocItem(id,null,'PDF 解析失敗：'+(err.message||'未知錯誤'));
+        }
+      };
+      r.onerror=()=>finalizeVDocItem(id,null,'PDF 檔案讀取失敗');
+      r.readAsArrayBuffer(f);
+    } else if(isDocx){
+      const id=addVDocPlaceholder(f.name,'docx');
+      const r=new FileReader();
+      r.onload=async ev=>{
+        try{
+          const text=await extractDocxText(ev.target.result);
+          if(!text||text.length<10){
+            finalizeVDocItem(id,null,'Word 文件內無法擷取到文字內容');
+          } else {
+            finalizeVDocItem(id,text);
+          }
+        }catch(err){
+          finalizeVDocItem(id,null,'Word 解析失敗：'+(err.message||'未知錯誤'));
+        }
+      };
+      r.onerror=()=>finalizeVDocItem(id,null,'Word 檔案讀取失敗');
+      r.readAsArrayBuffer(f);
+    } else if(isOldDoc){
+      alert('不支援舊版 .doc 格式，請另存為 .docx 後再上傳');
+    }
+    // 其他不支援的檔案類型直接忽略
   });
 }
 function addVFile(name,b64,dataUrl){
   const id='v'+Date.now()+Math.random().toString(36).slice(2);
   vItems.push({type:'file',id,name,b64,dataUrl,status:'pending'});
+  renderVGrid();
+}
+function addVDocPlaceholder(name,kind){
+  const id='v'+Date.now()+Math.random().toString(36).slice(2);
+  vItems.push({type:'file',id,name,kind,text:'',status:'extracting'});
+  renderVGrid();
+  return id;
+}
+function finalizeVDocItem(id,text,errMsg){
+  const item=vItems.find(x=>x.id===id);
+  if(!item)return;
+  if(errMsg){item.status='error';item.error=errMsg;}
+  else{item.text=text||'';item.status='pending';}
   renderVGrid();
 }
 function removeVFile(id){vItems=vItems.filter(x=>x.id!==id);renderVGrid();}
@@ -1354,7 +1456,7 @@ function removeVDivider(id){
   vItems.filter(x=>x.type==='divider').forEach(d=>{d.label='考卷 '+n++;});
   renderVGrid();
 }
-// 依分隔線把 vItems 切成群組，每個群組 = 同一份考卷的所有頁面
+// 依分隔線把 vItems 切成群組，每個群組 = 同一份考卷的所有頁面／檔案
 function vGroups(){
   const groups=[];let cur=[];
   vItems.forEach(item=>{
@@ -1363,6 +1465,15 @@ function vGroups(){
   });
   if(cur.length)groups.push(cur);
   return groups;
+}
+function vDocIcon(kind){return kind==='pdf'?'📕':(kind==='docx'?'📘':'📄');}
+function vCardMedia(f){
+  if(f.dataUrl)return `<img src="${f.dataUrl}" alt="${esc(f.name)}"/>`;
+  return `<div class="pdoc-icon">${vDocIcon(f.kind)}</div>`;
+}
+function vThumbHtml(f,w,h){
+  if(f.dataUrl)return `<img src="${f.dataUrl}" style="width:${w}px;height:${h}px;object-fit:cover;border-radius:8px;border:2px solid var(--g200);flex-shrink:0;"/>`;
+  return `<div style="width:${w}px;height:${h}px;border-radius:8px;border:2px solid var(--g200);flex-shrink:0;background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:1.6rem;">${vDocIcon(f.kind)}</div>`;
 }
 function renderVGrid(){
   const grid=document.getElementById('vGrid');
@@ -1385,12 +1496,13 @@ function renderVGroupBlock(files,gNum,lastItemIdx){
   g+=`<div class="pgrid-row-label">📄 考卷 ${gNum}${multi?`（共 ${files.length} 頁，將合併為一份檢測）`:''}</div>`;
   files.forEach(f=>{
     g+=`<div class="pcard ${f.status}" id="pc-${f.id}">
-      <img src="${f.dataUrl}" alt="${esc(f.name)}"/>
+      ${vCardMedia(f)}
       <div class="pname">${esc(f.name)}</div>
-      ${f.status==='pending'?`<button class="pdel" onclick="removeVFile('${f.id}')">✕</button>`:''}
+      ${['pending','error','extracting'].includes(f.status)?`<button class="pdel" onclick="removeVFile('${f.id}')">✕</button>`:''}
+      ${f.status==='extracting'?`<div class="pstatus"><span class="sp sm" style="display:inline-block;margin-right:3px;"></span>擷取文字中</div>`:''}
       ${f.status==='processing'?`<div class="pstatus"><span class="sp sm" style="display:inline-block;margin-right:3px;"></span>檢測中</div>`:''}
       ${f.status==='done'?`<div class="pstatus">✅ 完成</div>`:''}
-      ${f.status==='error'?`<div class="pstatus">❌ 失敗</div>`:''}
+      ${f.status==='error'?`<div class="pstatus" title="${esc(f.error||'')}">❌ ${f.error?esc(f.error):'失敗'}</div>`:''}
     </div>`;
   });
   g+=`</div>`;
@@ -1429,8 +1541,10 @@ function buildVGridWithInsertZones(){
 
 async function startValidate(){
   const groups=vGroups();
-  if(!groups.length){alert('請先上傳空白考卷照片');return;}
+  if(!groups.length){alert('請先上傳空白考卷照片、Word 或 PDF');return;}
   if(!AI.providers().length){alert('請先在「設定」輸入 Gemini 或 OpenAI API Key');return;}
+  const stillExtracting=vItems.some(x=>x.type==='file'&&x.status==='extracting');
+  if(stillExtracting){alert('還有文件正在擷取文字，請稍候再試一次');return;}
   const btn=document.getElementById('vStartBtn');
   btn.disabled=true;btn.textContent='⏳ 檢測中…';
   const progFill=document.getElementById('vProgFill');
@@ -1439,20 +1553,25 @@ async function startValidate(){
   document.getElementById('vProgArea').style.display='block';
   document.getElementById('vResults').innerHTML='';
   progFill.style.width='0%';
-  vItems.filter(x=>x.type==='file').forEach(f=>f.status='pending');
+  vItems.filter(x=>x.type==='file'&&x.status!=='error').forEach(f=>f.status='pending');
   const total=groups.length;
   let done=0;
   for(const group of groups){
-    group.forEach(f=>f.status='processing');renderVGrid();
-    progLabel.textContent=`檢測第 ${done+1}/${total} 份考卷${group.length>1?`（共 ${group.length} 頁）`:''}…`;
+    const usable=group.filter(f=>f.status!=='error');
+    if(!usable.length){
+      appendVError(group,new Error('此組檔案皆無法讀取，已略過'),done);
+      done++;progFill.style.width=(done/total*100)+'%';continue;
+    }
+    usable.forEach(f=>f.status='processing');renderVGrid();
+    progLabel.textContent=`檢測第 ${done+1}/${total} 份考卷${usable.length>1?`（共 ${usable.length} 頁）`:''}…`;
     progCount.textContent=`${done}/${total} 份完成`;
     try{
-      const r=await analyzeBlankPaperGroup(group);
-      group.forEach(f=>f.status='done');
-      appendVResult(group,r,done);
+      const r=await analyzeBlankPaperGroup(usable);
+      usable.forEach(f=>f.status='done');
+      appendVResult(usable,r,done);
     }catch(e){
-      group.forEach(f=>f.status='error');
-      appendVError(group,e,done);
+      usable.forEach(f=>f.status='error');
+      appendVError(usable,e,done);
     }
     done++;
     progFill.style.width=(done/total*100)+'%';
@@ -1465,9 +1584,17 @@ async function startValidate(){
 
 async function analyzeBlankPaperGroup(group){
   const multi=group.length>1;
-  const prompt=`你是台灣中小學考卷審題專家。${multi
-    ?`以下依序上傳了 ${group.length} 張照片，這幾張照片是「同一份」尚未作答的空白考卷的不同頁面（例如第1頁、第2頁…），請將它們視為一份完整考卷整體檢查，不要分開評論；標示位置時請盡量註明是第幾頁、第幾題（例如「第2頁·第5題」）。`
-    :`這是一張「尚未作答的空白考卷」照片，請以審題角度仔細檢查整份考卷內容品質。`}
+  const imageFiles=group.filter(f=>f.b64);
+  const textFiles=group.filter(f=>!f.b64&&f.text);
+  const extraText=textFiles.length
+    ?'\n\n【以下為文件中擷取的文字內容】'+textFiles.map(f=>`\n\n===== ${f.name} =====\n${f.text}`).join('')
+    :'';
+  const sourceDesc=multi
+    ?`以下依序提供了 ${group.length} 個檔案（照片或文件），這些都屬於「同一份」尚未作答的空白考卷的不同部分／頁面，請將它們視為一份完整考卷整體檢查，不要分開評論；標示位置時請盡量註明是第幾頁、第幾題。`
+    :(imageFiles.length
+      ?`這是一張「尚未作答的空白考卷」照片，請以審題角度仔細檢查整份考卷內容品質。`
+      :`以下是一份「尚未作答的空白考卷」的文字內容（由 Word/PDF 文件擷取），請以審題角度仔細檢查整份考卷內容品質。`);
+  const prompt=`你是台灣中小學考卷審題專家。${sourceDesc}${extraText}
 
 【檢查項目】
 1. 辨識這份考卷的「年級」與「科目」（優先以考卷標題為準，無標題則依題目內容推斷）。
@@ -1491,7 +1618,7 @@ async function analyzeBlankPaperGroup(group){
 }
 若某類別沒有發現問題，該欄位回傳空陣列 []。
 【重要】若問題數量很多，contentIssues、duplicates、inappropriate 三個陣列各自最多列出 8 筆最重要的即可，其餘可在 summary 註明「還有其他較輕微的問題未一一列出」；務必輸出語法正確、完整閉合的 JSON，字串中的换行請用 \\n、雙引號請用 \\" 跳脫。`;
-  const raw=await AI.call(prompt,group.map(f=>f.b64));
+  const raw=await AI.call(prompt,imageFiles.length?imageFiles.map(f=>f.b64):undefined);
   return parseAIJson(raw);
 }
 
@@ -1520,7 +1647,7 @@ function appendVResult(group,r,idx){
   </div>`;
   const div=document.createElement('div');div.className='card';
   div.style.borderLeft=`5px solid ${total?'var(--err)':'var(--ok)'}`;
-  const thumbs=group.map(f=>`<img src="${f.dataUrl}" style="width:64px;height:84px;object-fit:cover;border-radius:8px;border:2px solid var(--g200);flex-shrink:0;"/>`).join('');
+  const thumbs=group.map(f=>vThumbHtml(f,64,84)).join('');
   const fileNames=group.map(f=>f.name).join('、');
   div.innerHTML=`
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;">
