@@ -1640,6 +1640,39 @@ async function startValidate(){
   btn.disabled=false;btn.textContent='🔄 重新檢測';
 }
 
+/* 本地敏感詞／不當用語硬性比對清單（補強 AI 可能漏抓的隱晦暗語）。
+   註：部分詞彙需視上下文判斷，命中一律標示為「請人工複查」，寧可多提醒。
+   僅能對「可擷取文字」的檔案（Word / PDF）生效；純照片仍以 AI 判讀為主。 */
+const SENSITIVE_PATTERNS=[
+  // ① 性交易／情色暗語、黑話（多為隱晦諧音）
+  {re:/外送茶|摸摸茶|茶.{0,3}摸手|摸手.{0,3}茶|叫小姐|應召|援交|援助交際|買春|嫖妓|嫖客|一夜情|約[炮砲]|打[炮砲]|開房間/,
+   type:'隱晦性暗示／性交易暗語', desc:'疑似指涉性交易或情色服務的暗語、黑話（如「茶」「摸手」等隱語），不適合出現在考卷。', sug:'刪除，或改為與教學相關的中性用語。'},
+  // ② 明確性器官／性行為用語
+  {re:/陰莖|陽具|龜頭|陰道|陰蒂|睪丸|精液|射精|勃起|做愛|性交|口交|肛交|自慰|手淫|打手槍|打飛機|性高潮|裸體|裸照|乳交/,
+   type:'露骨性內容', desc:'含明確的性器官或性行為描述，不適合出現在考卷。', sug:'刪除相關內容。'},
+  // ③ 不雅俚語／粗俗、侮辱性字眼
+  {re:/雞[巴掰]|雞雞|屌|機掰|幹你娘|幹您娘|靠北|靠腰|王八蛋|婊子|賤人|賤貨/,
+   type:'不雅俚語／粗俗用語', desc:'粗俗、不雅或帶侮辱性的字眼，不適合出現在考卷。', sug:'改為得體用語。'},
+];
+function localSensitiveScan(text,locLabel){
+  if(!text)return [];
+  const hits=[],seen=new Set();
+  SENSITIVE_PATTERNS.forEach(p=>{
+    const re=new RegExp(p.re.source,'g');let m;
+    while((m=re.exec(text))!==null){
+      const term=m[0];
+      if(re.lastIndex===m.index)re.lastIndex++;
+      const key=p.type+'|'+term;
+      if(seen.has(key))continue; seen.add(key);
+      const i=Math.max(0,m.index-8),j=Math.min(text.length,m.index+term.length+8);
+      hits.push({location:locLabel||'文件內文',type:p.type,matched:term,
+        text:text.slice(i,j).replace(/\s+/g,' ').trim(),
+        description:p.desc+'（由系統敏感詞比對標示，請人工確認上下文）',suggestion:p.sug});
+    }
+  });
+  return hits;
+}
+
 async function analyzeBlankPaperGroup(group){
   const multi=group.length>1;
   const imageFiles=group.filter(f=>f.b64);
@@ -1679,7 +1712,18 @@ async function analyzeBlankPaperGroup(group){
 若某類別沒有發現問題，該欄位回傳空陣列 []。
 【重要】若問題數量很多，contentIssues、duplicates、inappropriate 三個陣列各自最多列出 8 筆最重要的即可，其餘可在 summary 註明「還有其他較輕微的問題未一一列出」；務必輸出語法正確、完整閉合的 JSON，字串中的换行請用 \\n、雙引號請用 \\" 跳脫。`;
   const raw=await AI.call(prompt,imageFiles.length?imageFiles.map(f=>f.b64):undefined);
-  return parseAIJson(raw);
+  const r=parseAIJson(raw);
+  // 本地敏感詞硬性比對：補強 AI 可能漏抓的隱晦不當用語（僅對可擷取文字的檔案生效）
+  try{
+    if(!Array.isArray(r.inappropriate))r.inappropriate=[];
+    textFiles.forEach(f=>{
+      localSensitiveScan(f.text,f.name).forEach(h=>{
+        const dup=r.inappropriate.some(x=>(x.text&&x.text.includes(h.matched))||(x.description&&x.description.includes(h.matched)));
+        if(!dup){delete h.matched;r.inappropriate.push(h);}
+      });
+    });
+  }catch(err){/* 比對失敗不影響 AI 結果 */}
+  return r;
 }
 
 function vSep(idx){
