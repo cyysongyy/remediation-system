@@ -133,6 +133,7 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
   <div class="nt" data-sec="assess">📝 健康評估</div>
   <div class="nt" data-sec="connect">🔗 匯入串接</div>
   <div class="nt" data-sec="risk">🔬 風險預測</div>
+  <div class="nt" data-sec="smart">🚨 智慧預警</div>
   <div class="nt" data-sec="trend">📈 趨勢追蹤</div>
   <div class="nt" data-sec="habit">✅ 每日習慣</div>
   <div class="nt" data-sec="advice">💡 建議 & AI</div>
@@ -353,6 +354,63 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
   </div>
 </div>
 
+<!-- ========== SMART ALERTS ========== -->
+<div class="sec" id="sec-smart">
+  <div id="smartEmpty" class="card empty">
+    <div class="em">🚨</div>
+    <div>尚無評估資料，請先完成 <a class="link" onclick="go('assess')">健康評估</a>。<br>存多次「紀錄點」後，系統可分析趨勢並預測未來走向。</div>
+  </div>
+  <div id="smartContent" style="display:none;">
+
+    <div class="card">
+      <div class="ct">🛎️ 主動健康警示 <span class="hint">依緊急程度排序</span></div>
+      <div id="alertList"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">🔮 未來走向預測 <span class="hint">依歷史紀錄線性外推</span></div>
+      <div id="projEmpty" class="hint" style="display:none;">需至少 3 筆紀錄點才能預測趨勢。目前累積越多，預測越準。</div>
+      <div id="projList"></div>
+      <div id="projChartWrap" style="display:none;">
+        <div style="margin:10px 0 6px;"><div class="seg" id="projSeg"></div></div>
+        <div class="cw tall"><canvas id="projChart"></canvas></div>
+        <div class="hint" style="text-align:center;margin-top:6px;">實線為歷史，虛線為未來 6 個月推估</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">🎯 最佳解決方案模擬器 <span class="hint">勾選你願意採取的行動</span></div>
+      <div class="hint" style="margin-bottom:10px;">系統會即時重算健康分、生理年齡與預期壽命，量化每項行動的效益，幫你找出最有效的組合。</div>
+      <div id="simList"></div>
+      <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:center;">
+        <div><div class="sl">健康分</div><div style="font-size:1.2rem;font-weight:800;"><span id="simScore0" style="color:var(--g400);">--</span> → <span id="simScore1" style="color:var(--ok);">--</span></div></div>
+        <div><div class="sl">生理年齡</div><div style="font-size:1.2rem;font-weight:800;"><span id="simBio0" style="color:var(--g400);">--</span> → <span id="simBio1" style="color:var(--purple);">--</span></div></div>
+        <div><div class="sl">預期壽命</div><div style="font-size:1.2rem;font-weight:800;"><span id="simLife0" style="color:var(--g400);">--</span> → <span id="simLife1" style="color:var(--acc);">--</span></div></div>
+      </div>
+      <div style="margin-top:12px;padding:11px;background:#f0fdfa;border-radius:10px;text-align:center;">
+        <span style="font-size:.85rem;font-weight:600;">🕰️ 這套組合預估可延壽 </span>
+        <span style="font-size:1.3rem;font-weight:800;color:var(--pri);" id="simGain">0</span>
+        <span style="font-size:.85rem;font-weight:600;"> 年，生理年齡年輕 </span>
+        <span style="font-size:1.3rem;font-weight:800;color:var(--purple);" id="simYounger">0</span>
+        <span style="font-size:.85rem;font-weight:600;"> 歲</span>
+      </div>
+      <div class="row-btn" style="margin-top:10px;">
+        <button class="btn bg" onclick="selectAllSim(true)">✅ 全選（最佳情境）</button>
+        <button class="btn bg" onclick="selectAllSim(false)">↺ 清除</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">🤖 自動化守護 <span class="hint">（需連結雲端後台）</span></div>
+      <div class="hint" style="line-height:1.7;">
+        連結 <b>health-backend.gs</b> 並執行 <code>setupDailyWatch()</code> 後，系統會<b>每日自動</b>用相同的警示引擎檢查你的最新數據，一旦偵測到危險門檻或惡化趨勢，<b>主動寄 Email 警告</b>與建議；並每週產生健康週報。讓健康系統從「你來查」變成「它來提醒你」。
+      </div>
+      <div id="watchStatus" style="margin-top:8px;"></div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ========== TREND ========== -->
 <div class="sec" id="sec-trend">
   <div class="card">
@@ -474,6 +532,7 @@ const HABITS=[
 ];
 let state=load();
 let charts={};
+function chartReady(){return typeof Chart!=='undefined';}
 
 function load(){
   try{return JSON.parse(localStorage.getItem(LS_KEY))||defaults();}catch(e){return defaults();}
@@ -496,6 +555,7 @@ function go(sec){
   if(sec==='risk')renderRisk();
   if(sec==='advice')renderAdvice();
   if(sec==='connect')renderImportResult();
+  if(sec==='smart')renderSmart();
 }
 function toast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
@@ -783,6 +843,7 @@ function renderDash(){
 }
 
 function drawGauge(score,color){
+  if(!chartReady())return;
   if(charts.gauge)charts.gauge.destroy();
   charts.gauge=new Chart(document.getElementById('scoreGauge'),{
     type:'doughnut',
@@ -842,6 +903,7 @@ function factorHTML(p,type){
   return '<div style="font-size:.76rem;color:var(--g600);">主要因子：'+items.map(i=>`<span class="pill mod" style="margin:2px;">${i}</span>`).join(' ')+'</div>';
 }
 function drawRadar(sub){
+  if(!chartReady())return;
   if(charts.radar)charts.radar.destroy();
   const keys=['cardio','body','activity','nutrition','sleep','substance','metabolic','mental'];
   charts.radar=new Chart(document.getElementById('radarChart'),{
@@ -950,6 +1012,7 @@ function renderTrend(){
   document.getElementById('trendContent').style.display=has?'block':'none';
   document.getElementById('trendTableCard').style.display=has?'block':'none';
   if(!has)return;
+  if(!chartReady()){return;}
   const m=TREND_METRICS.find(x=>x.k===curTrend);
   const pts=h.map(s=>({x:new Date(s.date).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}),y:s[curTrend]}));
   if(charts.trend)charts.trend.destroy();
@@ -1003,6 +1066,7 @@ function calcStreak(id){
   return s;
 }
 function drawHabitChart(){
+  if(!chartReady())return;
   const labels=[],data=[];
   for(let i=13;i>=0;i--){
     const d=new Date(Date.now()-i*86400000);const k=d.toISOString().slice(0,10);
@@ -1271,6 +1335,209 @@ function applyImport(){
     gasPost({action:'importLabs',labs}).catch(()=>{});
   }
   go('assess');toast('✅ 已帶入評估表，請確認後產生預測');
+}
+
+/* ============ 智慧預警：主動警示 + 未來預測 + 方案模擬 ============ */
+function renderSmart(){
+  const r=state.result,p=state.profile;
+  document.getElementById('smartEmpty').style.display=r?'none':'block';
+  document.getElementById('smartContent').style.display=r?'block':'none';
+  if(!r)return;
+  renderAlerts(p,r);
+  renderProjections();
+  buildSimulator(p,r);
+  document.getElementById('watchStatus').innerHTML = state.settings.gas
+    ? '<span class="pill low">☁️ 雲端已連線</span> <span class="hint">記得在 Apps Script 執行一次 setupDailyWatch() 啟用每日守護。</span>'
+    : '<span class="pill mod">尚未連結雲端</span> <span class="hint">前往「設定 → 雲端後台」即可啟用自動守護。</span>';
+}
+
+// ── 主動警示引擎（現值門檻 + 惡化趨勢）──
+function renderAlerts(p,r){
+  const alerts=analyzeAlerts(p,r,state.history);
+  const el=document.getElementById('alertList');
+  if(!alerts.length){ el.innerHTML='<div class="rec p3"><div class="rec-icon">✅</div><div class="rec-body"><div class="rec-title">目前沒有需要警示的項目</div><div class="rec-desc">各項指標都在安全範圍，請繼續保持並定期記錄。</div></div></div>'; return; }
+  const sev={crit:{p:1,icon:'🔴',tag:'立即注意'},warn:{p:2,icon:'🟠',tag:'需改善'},watch:{p:3,icon:'🟡',tag:'趨勢留意'}};
+  el.innerHTML='';
+  alerts.forEach(a=>{
+    const s=sev[a.level];
+    el.insertAdjacentHTML('beforeend',
+      `<div class="rec p${s.p}"><div class="rec-icon">${s.icon}</div><div class="rec-body">
+       <div class="rec-title">${a.title} <span class="pill ${a.level==='crit'?'high':a.level==='warn'?'mod':'low'}" style="margin-left:4px;">${s.tag}</span></div>
+       <div class="rec-desc">${a.desc}</div>
+       <div class="rec-gain">👉 建議：${a.action}</div></div></div>`);
+  });
+}
+function trendOf(key){
+  // 回傳最近數值變化（正=上升），需 >=2 筆
+  const pts=state.history.filter(s=>s[key]!=null&&s[key]!=='').map(s=>({t:new Date(s.date).getTime(),v:parseFloat(s[key])})).filter(o=>!isNaN(o.v));
+  if(pts.length<2)return null;
+  pts.sort((a,b)=>a.t-b.t);
+  const first=pts[0],last=pts[pts.length-1];
+  const months=Math.max((last.t-first.t)/2.592e9,0.1);
+  return {delta:last.v-first.v, perMonth:(last.v-first.v)/months, first:first.v, last:last.v, n:pts.length};
+}
+function analyzeAlerts(p,r,history){
+  const A=[];
+  const add=(level,title,desc,action)=>A.push({level,title,desc,action});
+  // 危急門檻
+  if(p.sbp>=180||p.dbp>=110)add('crit','血壓危急',`血壓 ${p.sbp}/${p.dbp} mmHg 已達高血壓危象範圍。`,'請儘速就醫評估，勿自行拖延。');
+  else if(p.sbp>=140||p.dbp>=90)add('warn','高血壓',`血壓 ${p.sbp}/${p.dbp} mmHg 屬高血壓。`,'減鈉、規律有氧、減重；必要時就醫用藥。');
+  if(p.glucose>=200)add('crit','血糖過高',`空腹血糖 ${p.glucose} mg/dL 明顯偏高。`,'建議儘速就醫做糖化血色素與進一步檢查。');
+  else if(p.glucose>=126)add('warn','血糖達糖尿病範圍',`空腹血糖 ${p.glucose} mg/dL（≥126）。`,'就醫確認診斷，控糖飲食＋運動。');
+  else if(p.glucose>=100)add('watch','血糖偏高（前期）',`空腹血糖 ${p.glucose} mg/dL 屬糖尿病前期。`,'減少精緻糖、增加纖維與運動，可逆轉。');
+  if(r.bmi>=35)add('warn','重度肥胖',`BMI ${r.bmi.toFixed(1)}。`,'循序減重 5-10%，結合飲食與運動並考慮專業協助。');
+  if(p.smoke==='current')add('warn','目前吸菸',`吸菸是最強的可修正致命因子。`,'尋求戒菸門診；戒菸 1 年心血管風險即減半。');
+  if(p.chol&&p.hdl&&p.chol/p.hdl>=5)add('warn','血脂比值偏高',`總膽固醇/HDL＝${(p.chol/p.hdl).toFixed(1)}。`,'減少飽和脂肪、增加運動；必要時就醫。');
+  if(r.risks.mets.count>=3)add('warn','符合代謝症候群',`已符合 ${r.risks.mets.count}/5 項。`,'同步改善腰圍、血壓、血糖、血脂多管齊下。');
+  // 惡化趨勢（需歷史）
+  const chk=(key,label,unit,thr)=>{
+    const t=trendOf(key);
+    if(t&&t.n>=2&&t.perMonth*thr.dir>0&&Math.abs(t.perMonth)>=thr.rate){
+      add('watch',`${label}呈${thr.dir>0?'上升':'下降'}趨勢`,
+        `${label}近期由 ${t.first} → ${t.last}${unit}（每月約 ${thr.dir>0?'+':''}${t.perMonth.toFixed(1)}）。`,
+        thr.msg);
+    }
+  };
+  chk('weight','體重','kg',{dir:1,rate:0.7,msg:'留意熱量攝取與活動量，避免持續增重。'});
+  chk('sbp','收縮壓','mmHg',{dir:1,rate:2,msg:'血壓上升中，加強減鈉與運動，密切監測。'});
+  chk('glucose','空腹血糖','mg/dL',{dir:1,rate:2,msg:'血糖走高，調整飲食並考慮檢查。'});
+  chk('score','健康分','',{dir:-1,rate:2,msg:'整體健康分下滑，回顧生活型態變化。'});
+  // 排序
+  A.sort((a,b)=>({crit:1,warn:2,watch:3}[a.level]-{crit:1,warn:2,watch:3}[b.level]));
+  return A;
+}
+
+// ── 未來走向預測（線性回歸外推）──
+const PROJ_METRICS=[
+  {k:'weight',label:'體重',unit:'kg',thr:null,color:'#0ea5e9'},
+  {k:'bmi',label:'BMI',unit:'',thr:{val:30,dir:1,name:'肥胖(30)'},color:'#8b5cf6'},
+  {k:'sbp',label:'收縮壓',unit:'mmHg',thr:{val:140,dir:1,name:'高血壓(140)'},color:'#ef4444'},
+  {k:'glucose',label:'空腹血糖',unit:'mg/dL',thr:{val:126,dir:1,name:'糖尿病(126)'},color:'#f59e0b'},
+  {k:'score',label:'健康分',unit:'',thr:null,color:'#0d9488'},
+  {k:'bio',label:'生理年齡',unit:'歲',thr:null,color:'#f97316'}
+];
+let curProj='weight';
+function linreg(pts){ // pts:[{x,y}] x=月
+  const n=pts.length,sx=pts.reduce((a,p)=>a+p.x,0),sy=pts.reduce((a,p)=>a+p.y,0);
+  const sxx=pts.reduce((a,p)=>a+p.x*p.x,0),sxy=pts.reduce((a,p)=>a+p.x*p.y,0);
+  const d=n*sxx-sx*sx; if(Math.abs(d)<1e-9)return null;
+  const slope=(n*sxy-sx*sy)/d, intercept=(sy-slope*sx)/n;
+  return {slope,intercept};
+}
+function seriesFor(key){
+  const raw=state.history.filter(s=>s[key]!=null&&s[key]!=='').map(s=>({t:new Date(s.date).getTime(),v:parseFloat(s[key])})).filter(o=>!isNaN(o.v));
+  raw.sort((a,b)=>a.t-b.t);
+  return raw;
+}
+function renderProjections(){
+  const el=document.getElementById('projList');el.innerHTML='';
+  const chartWrap=document.getElementById('projChartWrap');
+  const anyEnough=PROJ_METRICS.some(m=>seriesFor(m.k).length>=3);
+  document.getElementById('projEmpty').style.display=anyEnough?'none':'block';
+  chartWrap.style.display=anyEnough?'block':'none';
+  if(!anyEnough)return;
+  PROJ_METRICS.forEach(m=>{
+    const s=seriesFor(m.k); if(s.length<3)return;
+    const t0=s[0].t;
+    const pts=s.map(o=>({x:(o.t-t0)/2.592e9,y:o.v}));
+    const fit=linreg(pts); if(!fit)return;
+    const perMonth=fit.slope;
+    const cur=s[s.length-1].v;
+    let msg=`預估每月 ${perMonth>=0?'+':''}${perMonth.toFixed(2)}${m.unit}`;
+    let cls='low';
+    if(m.thr){
+      const monthsToThr=(m.thr.val-cur)/perMonth;
+      if(perMonth*m.thr.dir>0 && monthsToThr>0 && monthsToThr<60){
+        msg=`⚠️ 依此趨勢，約 <b>${Math.round(monthsToThr)} 個月</b>後可能達到${m.thr.name}門檻`;
+        cls=monthsToThr<12?'high':'mod';
+      }else if(perMonth*m.thr.dir<0){ msg=`✅ 正朝遠離${m.thr.name}的方向改善`; }
+    }
+    el.insertAdjacentHTML('beforeend',
+      `<div class="hb"><div class="hb-l"><span style="width:9px;height:9px;border-radius:50%;background:${m.color};display:inline-block;"></span>${m.label}</div>
+       <div style="font-size:.78rem;font-weight:600;color:var(--g600);text-align:right;">${msg} <span class="pill ${cls}" style="margin-left:4px;">${s.length}筆</span></div></div>`);
+  });
+  // 圖表選擇器
+  const seg=document.getElementById('projSeg');seg.innerHTML='';
+  PROJ_METRICS.filter(m=>seriesFor(m.k).length>=3).forEach(m=>{
+    if(!PROJ_METRICS.filter(x=>seriesFor(x.k).length>=3).some(x=>x.k===curProj))curProj=m.k;
+    const b=document.createElement('div');b.className='seg-btn'+(m.k===curProj?' on':'');
+    b.textContent=m.label;b.onclick=()=>{curProj=m.k;renderProjections();};seg.appendChild(b);
+  });
+  drawProjChart();
+}
+function drawProjChart(){
+  if(!chartReady())return;
+  const m=PROJ_METRICS.find(x=>x.k===curProj);const s=seriesFor(curProj);
+  if(s.length<3)return;
+  const t0=s[0].t;
+  const pts=s.map(o=>({x:(o.t-t0)/2.592e9,y:o.v}));
+  const fit=linreg(pts);
+  const lastX=pts[pts.length-1].x;
+  const labels=[],hist=[],proj=[];
+  s.forEach(o=>{labels.push(new Date(o.t).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}));});
+  const histY=s.map(o=>o.v);
+  // 未來 6 個月，每月一點
+  const future=[];
+  for(let mo=1;mo<=6;mo++){const x=lastX+mo;future.push({x,y:Math.round((fit.slope*x+fit.intercept)*10)/10});}
+  const projLabels=future.map((f,i)=>'+'+(i+1)+'月');
+  const allLabels=labels.concat(projLabels);
+  const histData=histY.concat(Array(6).fill(null));
+  const projData=Array(histY.length-1).fill(null).concat([histY[histY.length-1]]).concat(future.map(f=>f.y));
+  if(charts.proj)charts.proj.destroy();
+  charts.proj=new Chart(document.getElementById('projChart'),{
+    type:'line',
+    data:{labels:allLabels,datasets:[
+      {label:m.label+'（歷史）',data:histData,borderColor:m.color,backgroundColor:m.color+'22',tension:.2,pointRadius:4,spanGaps:false},
+      {label:'預測',data:projData,borderColor:m.color,borderDash:[6,4],pointRadius:3,tension:.2,spanGaps:true}
+    ]},
+    options:{plugins:{legend:{display:true,labels:{font:{size:10}}}},scales:{y:{beginAtZero:false}}}
+  });
+}
+
+// ── 最佳解決方案模擬器 ──
+const SIM_ACTIONS=[
+  {id:'quit',icon:'🚭',label:'戒菸',applies:p=>p.smoke==='current',apply:p=>{p.smoke='never';}},
+  {id:'exercise',icon:'🏃',label:'每週運動達 150 分鐘',applies:p=>(p.exercise||0)<150,apply:p=>{p.exercise=150;}},
+  {id:'weight',icon:'⚖️',label:'減重至健康體重（BMI 24）',applies:(p,r)=>r.bmi&&r.bmi>24,apply:p=>{p.weight=Math.round(24*Math.pow(p.height/100,2)*10)/10;if(p.waist)p.waist=Math.max(p.waist-8,p.height*0.48);}},
+  {id:'bp',icon:'❤️',label:'血壓控制到 <120',applies:p=>p.sbp&&p.sbp>=130,apply:p=>{p.sbp=118;if(p.dbp&&p.dbp>=80)p.dbp=76;}},
+  {id:'glucose',icon:'🩸',label:'空腹血糖降到 <100',applies:p=>p.glucose&&p.glucose>=100,apply:p=>{p.glucose=95;}},
+  {id:'diet',icon:'🥗',label:'飲食品質提升到「極佳」',applies:p=>p.diet<5,apply:p=>{p.diet=5;}},
+  {id:'sleep',icon:'😴',label:'每日睡足 7-8 小時',applies:p=>p.sleep!=null&&(p.sleep<7||p.sleep>9),apply:p=>{p.sleep=7.5;}},
+  {id:'alcohol',icon:'🍷',label:'飲酒降到每週 ≤7 份',applies:p=>p.alcohol&&p.alcohol>7,apply:p=>{p.alcohol=5;}},
+  {id:'stress',icon:'🧘',label:'壓力管理到「普通」以下',applies:p=>p.stress>=4,apply:p=>{p.stress=2;}}
+];
+let simState={};
+function buildSimulator(p,r){
+  const applicable=SIM_ACTIONS.filter(a=>a.applies(p,r));
+  const el=document.getElementById('simList');el.innerHTML='';
+  if(!applicable.length){ el.innerHTML='<div class="hint">🎉 目前各項生活型態都已在理想範圍，沒有可再優化的模擬項目。</div>'; document.getElementById('simScore0').textContent=r.score; document.getElementById('simScore1').textContent=r.score; document.getElementById('simBio0').textContent=r.bio; document.getElementById('simBio1').textContent=r.bio; document.getElementById('simLife0').textContent=r.life; document.getElementById('simLife1').textContent=r.life; document.getElementById('simGain').textContent='0'; document.getElementById('simYounger').textContent='0'; return; }
+  applicable.forEach(a=>{
+    if(simState[a.id]===undefined)simState[a.id]=false;
+    const row=document.createElement('div');row.className='hb';
+    row.innerHTML=`<div class="hb-l"><span class="hb-icon">${a.icon}</span>${a.label}</div>`;
+    const chk=document.createElement('div');chk.className='check'+(simState[a.id]?' on':'');chk.textContent='✓';
+    chk.onclick=()=>{simState[a.id]=!simState[a.id];buildSimulator(state.profile,state.result);};
+    row.appendChild(chk);el.appendChild(row);
+  });
+  runSim(p,r,applicable);
+}
+function runSim(p,r,applicable){
+  const mod=JSON.parse(JSON.stringify(p));
+  applicable.forEach(a=>{ if(simState[a.id])a.apply(mod,r); });
+  const nr=compute(mod);
+  document.getElementById('simScore0').textContent=r.score;
+  document.getElementById('simScore1').textContent=nr.score;
+  document.getElementById('simBio0').textContent=r.bio;
+  document.getElementById('simBio1').textContent=nr.bio;
+  document.getElementById('simLife0').textContent=r.life;
+  document.getElementById('simLife1').textContent=nr.life;
+  document.getElementById('simGain').textContent=(Math.round((nr.life-r.life)*10)/10);
+  document.getElementById('simYounger').textContent=(Math.round((r.bio-nr.bio)*10)/10);
+}
+function selectAllSim(on){
+  const applicable=SIM_ACTIONS.filter(a=>a.applies(state.profile,state.result));
+  applicable.forEach(a=>simState[a.id]=on);
+  buildSimulator(state.profile,state.result);
 }
 init();
 </script>

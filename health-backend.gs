@@ -213,6 +213,81 @@ function getOwnerEmail() {
   try { return Session.getEffectiveUser().getEmail() || ''; } catch (e) { return ''; }
 }
 
+// ── 自動化：每日主動守護（危險門檻 + 惡化趨勢 → 主動寄警告）──
+function setupDailyWatch() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'dailyHealthWatch') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailyHealthWatch').timeBased().everyDays(1).atHour(9).create();
+  return '✅ 已排程每日早上 9 點自動健康守護（偵測到警示才寄信）';
+}
+
+function dailyHealthWatch() {
+  const { rec } = setupSheets();
+  const all = sheetToObjects(rec, REC_COLS);
+  if (!all.length) return;
+  const cur = all[all.length - 1];
+  const alerts = evaluateAlerts(cur, all);
+  if (!alerts.length) return; // 沒有警示就不打擾
+
+  const email = NOTIFY_EMAIL || getOwnerEmail();
+  if (!email) return;
+
+  const rank = { crit: '🔴 立即注意', warn: '🟠 需改善', watch: '🟡 趨勢留意' };
+  let lines = ['【LifeSpan 健康守護警示】' + new Date().toLocaleDateString('zh-TW'), ''];
+  lines.push('系統偵測到以下需要關注的項目：', '');
+  alerts.forEach(a => {
+    lines.push(`${rank[a.level]}　${a.title}`);
+    lines.push(`　${a.desc}`);
+    lines.push(`　👉 建議：${a.action}`, '');
+  });
+  lines.push('（本警示由 LifeSpan 健康後台每日自動產生，僅供自我管理參考，非醫療診斷。危急症狀請立即就醫。）');
+  const body = lines.join('\n');
+
+  // 避免同一天重複寄送
+  const props = PropertiesService.getScriptProperties();
+  const today = new Date().toISOString().slice(0, 10);
+  const sig = today + '|' + alerts.map(a => a.level + a.title).join(';');
+  if (props.getProperty('lastAlertSig') === sig) return;
+  props.setProperty('lastAlertSig', sig);
+
+  const topLevel = alerts[0].level === 'crit' ? '🔴' : alerts[0].level === 'warn' ? '🟠' : '🟡';
+  try { MailApp.sendEmail(email, `${topLevel} LifeSpan 健康守護：發現 ${alerts.length} 項提醒`, body); } catch (err) {}
+}
+
+// 伺服器端警示引擎（與前端 analyzeAlerts 門檻一致）
+function evaluateAlerts(cur, all) {
+  const A = [];
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
+  const add = (level, title, desc, action) => A.push({ level, title, desc, action });
+  const sbp = n(cur.sbp), dbp = n(cur.dbp), glu = n(cur.glucose), bmi = n(cur.bmi), mets = n(cur.metsCount);
+
+  if (sbp >= 180 || dbp >= 110) add('crit', '血壓危急', `血壓 ${cur.sbp}/${cur.dbp} mmHg 達高血壓危象範圍。`, '請儘速就醫評估。');
+  else if (sbp >= 140 || dbp >= 90) add('warn', '高血壓', `血壓 ${cur.sbp}/${cur.dbp} mmHg 屬高血壓。`, '減鈉、規律運動、減重；必要時就醫。');
+  if (glu >= 200) add('crit', '血糖過高', `空腹血糖 ${cur.glucose} mg/dL 明顯偏高。`, '儘速就醫做進一步檢查。');
+  else if (glu >= 126) add('warn', '血糖達糖尿病範圍', `空腹血糖 ${cur.glucose} mg/dL（≥126）。`, '就醫確認並控糖。');
+  else if (glu >= 100) add('watch', '血糖偏高（前期）', `空腹血糖 ${cur.glucose} mg/dL 屬前期。`, '減糖、增纖維與運動，可逆轉。');
+  if (bmi >= 35) add('warn', '重度肥胖', `BMI ${bmi.toFixed(1)}。`, '循序減重 5-10%。');
+  if (String(cur.smoke) === 'current') add('warn', '目前吸菸', '吸菸是最強的可修正致命因子。', '尋求戒菸門診。');
+  if (mets >= 3) add('warn', '符合代謝症候群', `已符合 ${mets}/5 項。`, '多管齊下改善腰圍/血壓/血糖/血脂。');
+
+  // 惡化趨勢
+  const trend = key => {
+    const pts = all.filter(s => s[key] !== '' && s[key] != null).map(s => ({ t: new Date(s.date).getTime(), v: parseFloat(s[key]) })).filter(o => !isNaN(o.v));
+    if (pts.length < 3) return null;
+    pts.sort((a, b) => a.t - b.t);
+    const months = Math.max((pts[pts.length - 1].t - pts[0].t) / 2.592e9, 0.1);
+    return { first: pts[0].v, last: pts[pts.length - 1].v, perMonth: (pts[pts.length - 1].v - pts[0].v) / months };
+  };
+  [['weight', '體重', 'kg', 0.7], ['sbp', '收縮壓', 'mmHg', 2], ['glucose', '空腹血糖', 'mg/dL', 2]].forEach(([k, lbl, u, rate]) => {
+    const t = trend(k);
+    if (t && t.perMonth >= rate) add('watch', `${lbl}持續上升`, `${lbl}由 ${t.first} → ${t.last}${u}（每月約 +${t.perMonth.toFixed(1)}）。`, '及早調整生活型態，密切監測。');
+  });
+
+  A.sort((a, b) => ({ crit: 1, warn: 2, watch: 3 }[a.level] - { crit: 1, warn: 2, watch: 3 }[b.level]));
+  return A;
+}
+
 // ── 個人檔案 KV ─────────────────────────────────
 function readProfile() {
   const { kv } = setupSheets();
