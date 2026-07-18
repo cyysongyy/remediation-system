@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeSpan 健康預測 · 個人健康管理系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --pri:#0d9488;--pril:#ccfbf1;--prid:#0f766e;
+  --acc:#0ea5e9;
+  --ok:#10b981;--warn:#f59e0b;--err:#ef4444;--purple:#8b5cf6;
+  --g50:#f8fafc;--g100:#f1f5f9;--g200:#e2e8f0;
+  --g400:#94a3b8;--g600:#475569;--g700:#334155;--g900:#0f172a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;background:#ecfeff;color:var(--g900);min-height:100vh;}
+.hd{background:linear-gradient(135deg,var(--pri),var(--acc));color:#fff;padding:11px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:300;box-shadow:0 2px 12px rgba(13,148,136,.4);}
+.hd h1{font-size:1rem;font-weight:700;display:flex;align-items:center;gap:6px;}
+.hd-right{display:flex;align-items:center;gap:7px;}
+.api-badge{font-size:.67rem;padding:2px 7px;border-radius:10px;font-weight:600;}
+.api-on{background:rgba(16,185,129,.3);color:#a7f3d0;}
+.api-off{background:rgba(255,255,255,.12);color:rgba(255,255,255,.55);}
+.nav{background:#fff;display:flex;overflow-x:auto;border-bottom:2px solid var(--g200);
+  position:sticky;top:46px;z-index:200;padding:0 8px;}
+.nav::-webkit-scrollbar{height:0;}
+.nt{padding:10px 13px;cursor:pointer;font-size:.79rem;color:var(--g600);white-space:nowrap;
+  border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .18s;user-select:none;}
+.nt.active{color:var(--pri);border-bottom-color:var(--pri);font-weight:700;}
+.nt:hover:not(.active){color:var(--pri);background:var(--g50);}
+.main{max-width:920px;margin:0 auto;padding:16px 12px 70px;}
+.sec{display:none;}
+.sec.active{display:block;animation:fi .2s;}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);}
+.ct{font-size:.93rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.hint{font-size:.72rem;color:var(--g400);font-weight:500;}
+.sg{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:12px;}
+@media(min-width:620px){.sg{grid-template-columns:repeat(4,1fr);}}
+.sc{background:#fff;border-radius:12px;padding:14px 12px;box-shadow:0 1px 5px rgba(0,0,0,.08);border-left:4px solid var(--pri);}
+.sc.g{border-left-color:var(--ok);}.sc.o{border-left-color:var(--warn);}.sc.r{border-left-color:var(--err);}.sc.p{border-left-color:var(--purple);}.sc.b{border-left-color:var(--acc);}
+.sv{font-size:1.6rem;font-weight:800;line-height:1.1;}
+.sv small{font-size:.8rem;font-weight:600;color:var(--g400);}
+.sl{font-size:.72rem;color:var(--g400);margin-top:4px;font-weight:500;}
+.cw{position:relative;height:220px;}
+.cw.tall{height:270px;}
+.fg{margin-bottom:10px;}
+.fl{display:block;font-size:.79rem;font-weight:600;color:var(--g700);margin-bottom:4px;}
+.fi,.fs{width:100%;padding:8px 10px;border:1.5px solid var(--g200);border-radius:8px;
+  font-size:.86rem;font-family:inherit;color:var(--g900);background:#fff;transition:border-color .18s;}
+.fi:focus,.fs:focus{outline:none;border-color:var(--pri);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;}
+@media(max-width:480px){.fr3{grid-template-columns:1fr 1fr;}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border-radius:8px;
+  font-size:.84rem;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:inherit;}
+.bp{background:var(--pri);color:#fff;}.bp:hover{background:var(--prid);}
+.bg{background:var(--g100);color:var(--g700);}.bg:hover{background:var(--g200);}
+.bd{background:#fef2f2;color:var(--err);}.bd:hover{background:#fee2e2;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.row-btn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.big-num{font-size:3rem;font-weight:800;line-height:1;}
+.gauge-wrap{text-align:center;padding:8px 0;}
+.grade{display:inline-block;padding:4px 14px;border-radius:20px;font-weight:700;font-size:.85rem;color:#fff;margin-top:6px;}
+.pill{display:inline-block;padding:3px 10px;border-radius:14px;font-size:.72rem;font-weight:700;}
+.pill.low{background:#dcfce7;color:#15803d;}
+.pill.mod{background:#fef9c3;color:#a16207;}
+.pill.high{background:#fee2e2;color:#b91c1c;}
+.pill.vhigh{background:#7f1d1d;color:#fff;}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.bar-lbl{flex:0 0 92px;font-size:.76rem;font-weight:600;color:var(--g700);}
+.bar-track{flex:1;height:9px;background:var(--g100);border-radius:6px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:6px;transition:width .5s;}
+.bar-val{flex:0 0 34px;text-align:right;font-size:.74rem;font-weight:700;color:var(--g600);}
+.rec{display:flex;gap:10px;padding:11px;border-radius:10px;background:var(--g50);margin-bottom:9px;border-left:4px solid var(--g200);}
+.rec.p1{border-left-color:var(--err);background:#fef5f5;}
+.rec.p2{border-left-color:var(--warn);background:#fffbeb;}
+.rec.p3{border-left-color:var(--ok);background:#f0fdf4;}
+.rec-icon{font-size:1.3rem;flex:0 0 auto;}
+.rec-body{flex:1;}
+.rec-title{font-size:.85rem;font-weight:700;margin-bottom:2px;}
+.rec-desc{font-size:.77rem;color:var(--g600);line-height:1.45;}
+.rec-gain{font-size:.71rem;font-weight:700;color:var(--pri);margin-top:3px;}
+.empty{text-align:center;padding:40px 16px;color:var(--g400);}
+.empty .em{font-size:2.6rem;margin-bottom:10px;}
+.disc{font-size:.72rem;color:var(--g600);background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;line-height:1.5;margin-bottom:12px;}
+table{width:100%;border-collapse:collapse;font-size:.78rem;}
+th,td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--g100);}
+th{color:var(--g400);font-weight:600;font-size:.72rem;}
+td.num{font-variant-numeric:tabular-nums;font-weight:600;}
+.seg{display:flex;gap:6px;flex-wrap:wrap;}
+.seg-btn{padding:6px 12px;border-radius:8px;border:1.5px solid var(--g200);background:#fff;
+  font-size:.78rem;font-weight:600;color:var(--g600);cursor:pointer;transition:all .15s;font-family:inherit;}
+.seg-btn.on{background:var(--pri);border-color:var(--pri);color:#fff;}
+.hb{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;
+  background:var(--g50);margin-bottom:8px;}
+.hb-l{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:600;}
+.hb-icon{font-size:1.2rem;}
+.check{width:30px;height:30px;border-radius:50%;border:2px solid var(--g200);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:.9rem;transition:all .15s;background:#fff;color:transparent;}
+.check.on{background:var(--ok);border-color:var(--ok);color:#fff;}
+.streak{font-size:.72rem;font-weight:700;color:var(--warn);}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--g900);color:#fff;padding:11px 20px;border-radius:24px;font-size:.83rem;font-weight:600;
+  z-index:999;opacity:0;transition:all .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.ai-out{white-space:pre-wrap;font-size:.83rem;line-height:1.6;color:var(--g700);background:var(--g50);
+  border-radius:10px;padding:13px;margin-top:10px;}
+.link{color:var(--pri);text-decoration:none;font-weight:600;}
+.badge-note{font-size:.7rem;color:var(--g400);margin-top:4px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:620px){.two-col{grid-template-columns:1fr;}}
+.age-vs{display:flex;align-items:baseline;justify-content:center;gap:14px;margin:6px 0;}
+.age-block{text-align:center;}
+.age-block .n{font-size:2.2rem;font-weight:800;line-height:1;}
+.age-block .l{font-size:.72rem;color:var(--g400);margin-top:3px;}
+.age-arrow{font-size:1.4rem;color:var(--g400);}
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>🫀 LifeSpan 健康預測</h1>
+  <div class="hd-right">
+    <span id="cloudBadge" class="api-badge api-off" onclick="go('settings')" style="cursor:pointer;">☁️ 未連線</span>
+    <span id="aiBadge" class="api-badge api-off">AI 未設定</span>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nt active" data-sec="dash">📊 總覽</div>
+  <div class="nt" data-sec="assess">📝 健康評估</div>
+  <div class="nt" data-sec="connect">🔗 匯入串接</div>
+  <div class="nt" data-sec="risk">🔬 風險預測</div>
+  <div class="nt" data-sec="trend">📈 趨勢追蹤</div>
+  <div class="nt" data-sec="habit">✅ 每日習慣</div>
+  <div class="nt" data-sec="advice">💡 建議 & AI</div>
+  <div class="nt" data-sec="settings">⚙️ 設定</div>
+</div>
+
+<div class="main">
+
+<!-- ========== DASHBOARD ========== -->
+<div class="sec active" id="sec-dash">
+  <div id="dashEmpty" class="card empty">
+    <div class="em">🫀</div>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">歡迎使用 LifeSpan 健康預測</div>
+    <div style="font-size:.82rem;margin-bottom:14px;">輸入您的健康數據，系統會即時預測生理年齡、預期壽命與健康風險，並提供延壽建議。</div>
+    <button class="btn bp" onclick="go('assess')">📝 開始健康評估</button>
+  </div>
+
+  <div id="dashContent" style="display:none;">
+    <div class="card">
+      <div class="ct">🎯 綜合健康評分 <span class="hint" id="dashDate"></span></div>
+      <div class="gauge-wrap">
+        <div class="cw" style="height:210px;"><canvas id="scoreGauge"></canvas></div>
+        <div style="margin-top:-40px;">
+          <div class="big-num" id="scoreNum" style="color:var(--pri);">--</div>
+          <div class="grade" id="scoreGrade">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">⏳ 生理年齡 vs 實際年齡</div>
+      <div class="age-vs">
+        <div class="age-block"><div class="n" id="bioAge" style="color:var(--purple);">--</div><div class="l">生理年齡</div></div>
+        <div class="age-arrow">↔</div>
+        <div class="age-block"><div class="n" id="chronoAge" style="color:var(--g600);">--</div><div class="l">實際年齡</div></div>
+      </div>
+      <div style="text-align:center;font-size:.82rem;font-weight:600;margin-top:4px;" id="ageVerdict"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">🕰️ 預期壽命預測 <span class="hint">（估算，非診斷）</span></div>
+      <div style="text-align:center;">
+        <div class="big-num" id="lifeExp" style="color:var(--acc);">--</div>
+        <div class="sl" style="font-size:.8rem;">歲（基於目前生活型態的推估區間 <span id="lifeRange"></span>）</div>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:#f0fdfa;border-radius:10px;text-align:center;">
+        <span style="font-size:.82rem;font-weight:600;">💪 改善可修正因素，最多可再爭取 </span>
+        <span style="font-size:1.1rem;font-weight:800;color:var(--pri);" id="potentialGain">--</span>
+        <span style="font-size:.82rem;font-weight:600;"> 年</span>
+      </div>
+    </div>
+
+    <div class="sg">
+      <div class="sc b"><div class="sv" id="mBmi">--</div><div class="sl">BMI 身體質量</div></div>
+      <div class="sc"><div class="sv" id="mWhtr">--</div><div class="sl">腰高比</div></div>
+      <div class="sc o"><div class="sv" id="mBp">--</div><div class="sl">血壓 mmHg</div></div>
+      <div class="sc p"><div class="sv" id="mBmr">--</div><div class="sl">基礎代謝 kcal</div></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">📊 各面向健康分數</div>
+      <div id="dashBars"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== ASSESSMENT ========== -->
+<div class="sec" id="sec-assess">
+  <div class="disc">⚠️ <b>免責聲明：</b>本系統為健康自我管理與衛教用途，所有預測皆為基於公開流行病學研究的統計估算，<b>不能取代醫療診斷</b>。如有健康疑慮，請諮詢合格醫師。</div>
+
+  <div class="card">
+    <div class="ct">👤 基本資料</div>
+    <div class="fr3">
+      <div class="fg"><label class="fl">性別</label>
+        <select class="fs" id="in-sex"><option value="male">男性</option><option value="female">女性</option></select></div>
+      <div class="fg"><label class="fl">年齡</label><input class="fi" id="in-age" type="number" placeholder="歲" min="18" max="110"></div>
+      <div class="fg"><label class="fl">身高</label><input class="fi" id="in-height" type="number" placeholder="cm"></div>
+    </div>
+    <div class="fr3">
+      <div class="fg"><label class="fl">體重</label><input class="fi" id="in-weight" type="number" placeholder="kg" step="0.1"></div>
+      <div class="fg"><label class="fl">腰圍</label><input class="fi" id="in-waist" type="number" placeholder="cm"></div>
+      <div class="fg"><label class="fl">靜止心率</label><input class="fi" id="in-hr" type="number" placeholder="bpm"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">🩸 生理指標 <span class="hint">（若有健檢數據）</span></div>
+    <div class="fr3">
+      <div class="fg"><label class="fl">收縮壓</label><input class="fi" id="in-sbp" type="number" placeholder="mmHg"></div>
+      <div class="fg"><label class="fl">舒張壓</label><input class="fi" id="in-dbp" type="number" placeholder="mmHg"></div>
+      <div class="fg"><label class="fl">空腹血糖</label><input class="fi" id="in-glucose" type="number" placeholder="mg/dL"></div>
+    </div>
+    <div class="fr3">
+      <div class="fg"><label class="fl">總膽固醇</label><input class="fi" id="in-chol" type="number" placeholder="mg/dL"></div>
+      <div class="fg"><label class="fl">HDL 好膽固醇</label><input class="fi" id="in-hdl" type="number" placeholder="mg/dL"></div>
+      <div class="fg"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">🏃 生活型態</div>
+    <div class="fg"><label class="fl">吸菸狀況</label>
+      <select class="fs" id="in-smoke"><option value="never">從不吸菸</option><option value="former">已戒菸</option><option value="current">目前吸菸</option></select></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">每週運動（分鐘）</label><input class="fi" id="in-exercise" type="number" placeholder="min/週"></div>
+      <div class="fg"><label class="fl">每週飲酒（份）</label><input class="fi" id="in-alcohol" type="number" placeholder="份/週"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">每日睡眠（小時）</label><input class="fi" id="in-sleep" type="number" placeholder="小時" step="0.5"></div>
+      <div class="fg"><label class="fl">每日靜坐時間（小時）</label><input class="fi" id="in-sitting" type="number" placeholder="小時"></div>
+    </div>
+    <div class="fg"><label class="fl">飲食品質（蔬果、少加工）</label>
+      <div class="seg" id="seg-diet"></div></div>
+    <div class="fg" style="margin-top:10px;"><label class="fl">壓力/情緒狀態</label>
+      <div class="seg" id="seg-stress"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="ct">🧬 家族病史 <span class="hint">（直系親屬早發病史）</span></div>
+    <div class="fr3">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;"><input type="checkbox" id="in-fh-heart"> 心血管疾病</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;"><input type="checkbox" id="in-fh-diabetes"> 糖尿病</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;"><input type="checkbox" id="in-fh-cancer"> 癌症</label>
+    </div>
+  </div>
+
+  <div class="row-btn">
+    <button class="btn bp" onclick="runAssessment()">🔮 產生健康預測</button>
+    <button class="btn bg" onclick="loadSample()">📋 載入範例</button>
+    <button class="btn bg" onclick="saveSnapshot()">💾 存為紀錄點</button>
+  </div>
+</div>
+
+<!-- ========== CONNECT / IMPORT ========== -->
+<div class="sec" id="sec-connect">
+  <div class="disc">🔗 <b>資料串接說明：</b>台灣全民健保基於安全設計，<b>未開放</b>第三方 App 直接讀取。正確流程是：由你本人到 <b>健保快易通／健康存摺</b> 匯出自己的資料（FHIR/JSON），再於此匯入，系統會自動解析檢驗值並帶入評估。所有解析都在你的瀏覽器完成，資料不外傳。</div>
+
+  <div class="card">
+    <div class="ct">🏥 健康存摺（My Health Bank）</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      步驟：健保快易通 App 或 <a class="link" href="https://myhealthbank.nhi.gov.tw/" target="_blank">健康存摺網站</a> → 登入 → 下載／匯出（FHIR 或 JSON）→ 於此上傳。<br>
+      自動擷取：血壓、空腹血糖、糖化血色素、總膽固醇、HDL、體重、身高、心率等。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileFhir').click()">📥 上傳健康存摺檔案</button>
+    <input type="file" id="fileFhir" accept=".json,.txt" style="display:none;" onchange="handleImport(event,'nhi')">
+  </div>
+
+  <div class="card">
+    <div class="ct">⌚ 穿戴裝置 / 健康 App</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      支援 Apple 健康「匯出所有健康資料」(export.xml) 與 Google Fit 匯出 (JSON)。自動彙整：每日步數 → 每週運動量、靜止心率、睡眠時數。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileWear').click()">📥 上傳穿戴裝置匯出檔</button>
+    <input type="file" id="fileWear" accept=".xml,.json" style="display:none;" onchange="handleImport(event,'wearable')">
+  </div>
+
+  <div class="card">
+    <div class="ct">📎 現有 App / 附件資料</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      匯入其他系統匯出的健康資料檔（JSON 或 CSV）。CSV 標題若含 sbp/dbp/glucose/chol/hdl/weight/height/hr 等欄位會自動對應。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileApp').click()">📥 上傳 JSON / CSV</button>
+    <input type="file" id="fileApp" accept=".json,.csv,.txt" style="display:none;" onchange="handleImport(event,'app')">
+  </div>
+
+  <div class="card" id="importResultCard" style="display:none;">
+    <div class="ct">✅ 匯入結果</div>
+    <div id="importResult"></div>
+    <div class="row-btn">
+      <button class="btn bp" onclick="applyImport()">➡️ 帶入健康評估</button>
+      <button class="btn bg" onclick="go('assess')">📝 前往評估表</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== RISK ========== -->
+<div class="sec" id="sec-risk">
+  <div id="riskEmpty" class="card empty">
+    <div class="em">🔬</div>
+    <div>尚無評估資料，請先完成 <a class="link" onclick="go('assess')">健康評估</a>。</div>
+  </div>
+  <div id="riskContent" style="display:none;">
+    <div class="disc">以下為<b>相對風險</b>分級估算（低 / 中 / 高 / 極高），用於自我警覺與生活調整參考，非臨床診斷工具。</div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="ct">❤️ 心血管疾病風險</div>
+        <div style="text-align:center;padding:6px 0;">
+          <span class="pill" id="cvdPill">--</span>
+          <div class="sl" style="margin-top:8px;font-size:.78rem;" id="cvdNote"></div>
+        </div>
+        <div id="cvdFactors" style="margin-top:10px;"></div>
+      </div>
+      <div class="card">
+        <div class="ct">🩸 第二型糖尿病風險</div>
+        <div style="text-align:center;padding:6px 0;">
+          <span class="pill" id="dmPill">--</span>
+          <div class="sl" style="margin-top:8px;font-size:.78rem;" id="dmNote"></div>
+        </div>
+        <div id="dmFactors" style="margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">🔥 代謝症候群指標 <span class="hint">（符合 3 項以上即警示）</span></div>
+      <div id="metsList"></div>
+      <div style="text-align:center;margin-top:8px;">
+        <span class="pill" id="metsPill">--</span>
+        <span style="font-size:.8rem;font-weight:600;margin-left:6px;" id="metsCount"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ct">📉 風險因子雷達圖</div>
+      <div class="cw tall"><canvas id="radarChart"></canvas></div>
+      <div class="hint" style="text-align:center;margin-top:6px;">分數越靠外圈代表該面向風險越低（越健康）</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TREND ========== -->
+<div class="sec" id="sec-trend">
+  <div class="card">
+    <div class="ct">📈 趨勢追蹤 <span class="hint">紀錄點</span></div>
+    <div style="margin-bottom:10px;">
+      <div class="seg" id="trendMetricSeg"></div>
+    </div>
+    <div id="trendEmpty" class="empty">
+      <div class="em">📈</div>
+      <div>尚無紀錄點。到「健康評估」填入數據後點<b>「💾 存為紀錄點」</b>即可開始追蹤變化。</div>
+    </div>
+    <div id="trendContent" style="display:none;">
+      <div class="cw tall"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+  <div class="card" id="trendTableCard" style="display:none;">
+    <div class="ct">📋 歷史紀錄</div>
+    <div style="overflow-x:auto;">
+      <table id="trendTable"></table>
+    </div>
+    <div class="row-btn"><button class="btn bd" onclick="clearHistory()">🗑️ 清除所有紀錄</button></div>
+  </div>
+</div>
+
+<!-- ========== HABIT ========== -->
+<div class="sec" id="sec-habit">
+  <div class="card">
+    <div class="ct">✅ 今日健康習慣 <span class="hint" id="habitDate"></span></div>
+    <div id="habitList"></div>
+  </div>
+  <div class="card">
+    <div class="ct">🔥 近 14 天完成度</div>
+    <div class="cw"><canvas id="habitChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ========== ADVICE ========== -->
+<div class="sec" id="sec-advice">
+  <div id="adviceEmpty" class="card empty">
+    <div class="em">💡</div>
+    <div>尚無評估資料，請先完成 <a class="link" onclick="go('assess')">健康評估</a>。</div>
+  </div>
+  <div id="adviceContent" style="display:none;">
+    <div class="card">
+      <div class="ct">🎯 個人化延壽行動清單 <span class="hint">依影響程度排序</span></div>
+      <div id="recList"></div>
+    </div>
+    <div class="card">
+      <div class="ct">🤖 AI 健康顧問 <span class="hint">（選填，需設定 API Key）</span></div>
+      <div class="hint" style="margin-bottom:10px;">將您的（去識別化）健康摘要送給 AI，取得更詳細的個人化建議。</div>
+      <button class="btn bp" id="aiBtn" onclick="askAI()">✨ 產生 AI 健康建議</button>
+      <div id="aiOut" class="ai-out" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SETTINGS ========== -->
+<div class="sec" id="sec-settings">
+  <div class="card">
+    <div class="ct">☁️ 雲端後台 <span class="hint">（Google Apps Script + 試算表）</span></div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      連結後可跨裝置雲端同步、自動比對、每週自動產生健康週報（Email）。設定方式見 <b>health-backend.gs</b> 說明。
+    </div>
+    <div class="fg"><label class="fl">Apps Script 部署網址</label><input class="fi" id="set-gas" type="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;margin:8px 0;"><input type="checkbox" id="set-autosync"> 存為紀錄點時自動同步雲端</label>
+    <div class="row-btn">
+      <button class="btn bp" onclick="testCloud()">🔌 測試連線</button>
+      <button class="btn bg" onclick="cloudPush()">⬆️ 上傳全部到雲端</button>
+      <button class="btn bg" onclick="cloudPull()">⬇️ 從雲端拉取</button>
+    </div>
+    <div id="cloudMsg" class="hint" style="margin-top:8px;"></div>
+  </div>
+  <div class="card">
+    <div class="ct">🤖 AI 引擎設定 <span class="hint">（選填）</span></div>
+    <div class="hint" style="margin-bottom:10px;">設定後可使用「AI 健康顧問」。Key 僅存於您的瀏覽器，直接呼叫 API，不經第三方伺服器。</div>
+    <div class="fg"><label class="fl">Google Gemini API Key</label><input class="fi" id="set-gemini" type="password" placeholder="AIzaSy… 或 AQ.Ab8R…"></div>
+    <div class="fg"><label class="fl">OpenAI API Key</label><input class="fi" id="set-openai" type="password" placeholder="sk-…"></div>
+    <div class="fg"><label class="fl">優先引擎</label>
+      <select class="fs" id="set-engine"><option value="auto">自動</option><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></div>
+    <a class="link" href="https://aistudio.google.com/apikey" target="_blank" style="font-size:.78rem;">→ 免費取得 Gemini API Key</a>
+    <div class="row-btn" style="margin-top:12px;"><button class="btn bp" onclick="saveSettings()">💾 儲存設定</button></div>
+  </div>
+  <div class="card">
+    <div class="ct">💾 資料管理</div>
+    <div class="hint" style="margin-bottom:10px;">所有資料儲存於本機瀏覽器 localStorage。</div>
+    <div class="row-btn">
+      <button class="btn bg" onclick="exportData()">📤 匯出資料 (JSON)</button>
+      <button class="btn bg" onclick="document.getElementById('importFile').click()">📥 匯入資料</button>
+      <button class="btn bd" onclick="resetAll()">🗑️ 清除全部資料</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
+  </div>
+  <div class="card">
+    <div class="ct">ℹ️ 關於</div>
+    <div style="font-size:.8rem;color:var(--g600);line-height:1.6;">
+      <b>LifeSpan 健康預測</b> 是一套個人健康管理與延壽輔助系統。<br>
+      預測模型整合了 BMI、腰高比、血壓、代謝、運動、睡眠、飲食、吸菸等實證流行病學因子，估算生理年齡、預期壽命與慢性病相對風險。<br><br>
+      <span class="hint">本工具僅供衛教與自我管理參考，不構成醫療建議。· 2026</span>
+    </div>
+  </div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 常數 & 狀態 ============ */
+const LS_KEY='lifespan_data_v1';
+const DIET_LABELS=['很差','偏差','普通','良好','極佳'];
+const STRESS_LABELS=['很低','偏低','普通','偏高','很高'];
+const HABITS=[
+  {id:'water',icon:'💧',name:'喝足 8 杯水'},
+  {id:'move',icon:'🏃',name:'運動 ≥30 分鐘'},
+  {id:'veg',icon:'🥗',name:'吃到 5 份蔬果'},
+  {id:'sleep',icon:'😴',name:'睡滿 7 小時'},
+  {id:'nosmoke',icon:'🚭',name:'今日不吸菸'},
+  {id:'meditate',icon:'🧘',name:'放鬆/冥想 10 分'},
+  {id:'stand',icon:'🚶',name:'每小時起身活動'}
+];
+let state=load();
+let charts={};
+
+function load(){
+  try{return JSON.parse(localStorage.getItem(LS_KEY))||defaults();}catch(e){return defaults();}
+}
+function defaults(){
+  return {profile:null, result:null, history:[], habits:{}, settings:{gemini:'',openai:'',engine:'auto',gas:'',autosync:false}, dietVal:3, stressVal:3};
+}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
+
+/* ============ 導覽 ============ */
+document.querySelectorAll('.nt').forEach(t=>t.onclick=()=>go(t.dataset.sec));
+function go(sec){
+  document.querySelectorAll('.nt').forEach(t=>t.classList.toggle('active',t.dataset.sec===sec));
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+sec).classList.add('active');
+  window.scrollTo(0,0);
+  if(sec==='trend')renderTrend();
+  if(sec==='habit')renderHabits();
+  if(sec==='dash')renderDash();
+  if(sec==='risk')renderRisk();
+  if(sec==='advice')renderAdvice();
+  if(sec==='connect')renderImportResult();
+}
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+/* ============ 分段按鈕 ============ */
+function buildSeg(containerId,labels,current,cb){
+  const c=document.getElementById(containerId);c.innerHTML='';
+  labels.forEach((lbl,i)=>{
+    const b=document.createElement('div');b.className='seg-btn'+(i+1===current?' on':'');
+    b.textContent=lbl;b.onclick=()=>{cb(i+1);buildSeg(containerId,labels,i+1,cb);};
+    c.appendChild(b);
+  });
+}
+buildSeg('seg-diet',DIET_LABELS,state.dietVal,v=>{state.dietVal=v;save();});
+buildSeg('seg-stress',STRESS_LABELS,state.stressVal,v=>{state.stressVal=v;save();});
+
+/* ============ 讀取輸入 ============ */
+function num(id){const v=parseFloat(document.getElementById(id).value);return isNaN(v)?null:v;}
+function readProfile(){
+  return {
+    sex:document.getElementById('in-sex').value,
+    age:num('in-age'), height:num('in-height'), weight:num('in-weight'), waist:num('in-waist'),
+    hr:num('in-hr'), sbp:num('in-sbp'), dbp:num('in-dbp'), glucose:num('in-glucose'),
+    chol:num('in-chol'), hdl:num('in-hdl'),
+    smoke:document.getElementById('in-smoke').value,
+    exercise:num('in-exercise'), alcohol:num('in-alcohol'), sleep:num('in-sleep'), sitting:num('in-sitting'),
+    diet:state.dietVal, stress:state.stressVal,
+    fhHeart:document.getElementById('in-fh-heart').checked,
+    fhDiabetes:document.getElementById('in-fh-diabetes').checked,
+    fhCancer:document.getElementById('in-fh-cancer').checked
+  };
+}
+function fillProfile(p){
+  if(!p)return;
+  const set=(id,v)=>{if(v!==null&&v!==undefined)document.getElementById(id).value=v;};
+  document.getElementById('in-sex').value=p.sex||'male';
+  set('in-age',p.age);set('in-height',p.height);set('in-weight',p.weight);set('in-waist',p.waist);
+  set('in-hr',p.hr);set('in-sbp',p.sbp);set('in-dbp',p.dbp);set('in-glucose',p.glucose);
+  set('in-chol',p.chol);set('in-hdl',p.hdl);
+  document.getElementById('in-smoke').value=p.smoke||'never';
+  set('in-exercise',p.exercise);set('in-alcohol',p.alcohol);set('in-sleep',p.sleep);set('in-sitting',p.sitting);
+  document.getElementById('in-fh-heart').checked=!!p.fhHeart;
+  document.getElementById('in-fh-diabetes').checked=!!p.fhDiabetes;
+  document.getElementById('in-fh-cancer').checked=!!p.fhCancer;
+  state.dietVal=p.diet||3;state.stressVal=p.stress||3;
+  buildSeg('seg-diet',DIET_LABELS,state.dietVal,v=>{state.dietVal=v;save();});
+  buildSeg('seg-stress',STRESS_LABELS,state.stressVal,v=>{state.stressVal=v;save();});
+}
+
+/* ============ 核心：健康預測模型 ============ */
+function compute(p){
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  // 衍生指標
+  const bmi = (p.weight&&p.height)? p.weight/Math.pow(p.height/100,2) : null;
+  const whtr = (p.waist&&p.height)? p.waist/p.height : null;
+  // BMR (Mifflin-St Jeor)
+  let bmr=null,tdee=null;
+  if(p.weight&&p.height&&p.age){
+    bmr = 10*p.weight + 6.25*p.height - 5*p.age + (p.sex==='male'?5:-161);
+    const act = p.exercise>=150?1.55 : p.exercise>=75?1.4 : p.exercise>0?1.3 : 1.2;
+    tdee = bmr*act;
+  }
+  // 各面向子分數 0-100（越高越健康）
+  const sub={};
+  // 心血管：血壓 + 心率
+  let cardio=100;
+  if(p.sbp){ if(p.sbp>=160)cardio-=45; else if(p.sbp>=140)cardio-=30; else if(p.sbp>=130)cardio-=15; else if(p.sbp<110)cardio-=0; }
+  if(p.dbp){ if(p.dbp>=100)cardio-=15; else if(p.dbp>=90)cardio-=8; }
+  if(p.hr){ if(p.hr>85)cardio-=18; else if(p.hr>75)cardio-=8; else if(p.hr<60)cardio+=3; }
+  sub.cardio=clamp(cardio,0,100);
+  // 身體組成：BMI + 腰高比
+  let body=100;
+  if(bmi){ if(bmi>=35)body-=45; else if(bmi>=30)body-=32; else if(bmi>=27)body-=20; else if(bmi>=24)body-=10; else if(bmi<18.5)body-=15; }
+  if(whtr){ if(whtr>=0.6)body-=25; else if(whtr>=0.55)body-=15; else if(whtr>=0.5)body-=8; }
+  sub.body=clamp(body,0,100);
+  // 活動
+  let act=40;
+  if(p.exercise!=null){ if(p.exercise>=300)act=100; else if(p.exercise>=150)act=90; else if(p.exercise>=75)act=70; else if(p.exercise>=30)act=52; else if(p.exercise>0)act=40; else act=25; }
+  if(p.sitting!=null){ if(p.sitting>=10)act-=15; else if(p.sitting>=8)act-=8; }
+  sub.activity=clamp(act,0,100);
+  // 營養
+  sub.nutrition=clamp((p.diet-1)/4*100,0,100);
+  // 睡眠
+  let sl=70;
+  if(p.sleep!=null){ if(p.sleep>=7&&p.sleep<=9)sl=100; else if(p.sleep>=6&&p.sleep<10)sl=75; else if(p.sleep>=5)sl=50; else sl=30; if(p.sleep>10)sl=55; }
+  sub.sleep=clamp(sl,0,100);
+  // 物質（吸菸/飲酒）
+  let sub_s=100;
+  if(p.smoke==='current')sub_s-=55; else if(p.smoke==='former')sub_s-=12;
+  if(p.alcohol!=null){ if(p.alcohol>14)sub_s-=25; else if(p.alcohol>7)sub_s-=10; }
+  sub.substance=clamp(sub_s,0,100);
+  // 心理
+  sub.mental=clamp((5-p.stress)/4*100,0,100);
+  // 代謝（血糖）
+  let meta=100;
+  if(p.glucose){ if(p.glucose>=126)meta-=45; else if(p.glucose>=100)meta-=20; }
+  if(p.chol&&p.hdl){ const ratio=p.chol/p.hdl; if(ratio>=5)meta-=20; else if(ratio>=4)meta-=10; }
+  sub.metabolic=clamp(meta,0,100);
+
+  // 綜合分數（加權）
+  const weights={cardio:.16,body:.16,activity:.18,nutrition:.12,sleep:.10,substance:.14,mental:.06,metabolic:.08};
+  let score=0,wsum=0;
+  for(const k in weights){ score+=sub[k]*weights[k]; wsum+=weights[k]; }
+  score=Math.round(score/wsum);
+
+  // 生理年齡
+  let bio=p.age||40;
+  if(p.smoke==='current')bio+=6; else if(p.smoke==='former')bio+=1.5;
+  if(bmi){ if(bmi>=35)bio+=5; else if(bmi>=30)bio+=3; else if(bmi>=27)bio+=1.8; else if(bmi>=24)bio+=0.8; else if(bmi<18.5)bio+=1; }
+  if(p.exercise!=null){ if(p.exercise>=150)bio-=2; else if(p.exercise>=75)bio-=1; else if(p.exercise===0)bio+=1.5; }
+  if(p.sleep!=null){ if(p.sleep>=7&&p.sleep<=9)bio-=0.5; else if(p.sleep<6||p.sleep>10)bio+=2; else bio+=0.5; }
+  if(p.sbp){ if(p.sbp>=160)bio+=4; else if(p.sbp>=140)bio+=2.5; else if(p.sbp>=130)bio+=1; else if(p.sbp<120)bio-=0.5; }
+  if(p.hr){ if(p.hr>80)bio+=2; else if(p.hr>70)bio+=1; else if(p.hr<60)bio-=1; }
+  bio+= [null,2,1,0,-0.5,-1.5][p.diet];
+  if(p.alcohol!=null){ if(p.alcohol>14)bio+=3; else if(p.alcohol>7)bio+=1; }
+  bio+= [null,-0.5,0,0.5,1.5,2.5][p.stress];
+  if(p.glucose){ if(p.glucose>=126)bio+=3; else if(p.glucose>=100)bio+=1.5; }
+  if(whtr){ if(whtr>=0.6)bio+=2.5; else if(whtr>=0.5)bio+=1; }
+  if(p.fhHeart)bio+=1; if(p.fhDiabetes)bio+=0.5; if(p.fhCancer)bio+=0.5;
+  if(p.age)bio=clamp(bio,Math.max(18,p.age-8),p.age+16);
+  bio=Math.round(bio*10)/10;
+
+  // 預期壽命
+  const base = p.sex==='male'?78:84; // 台灣約略基準
+  const mods=[]; // {label, years}
+  const M=(label,years)=>{ if(years!==0)mods.push({label,years:Math.round(years*10)/10}); };
+  if(p.smoke==='current')M('吸菸',-8); else if(p.smoke==='former')M('已戒菸',-2);
+  if(p.exercise!=null){ if(p.exercise>=150)M('規律運動',3); else if(p.exercise>=75)M('中等運動',1.5); else if(p.exercise===0)M('久坐不動',-1.5); }
+  if(bmi){ if(bmi>=35)M('重度肥胖',-4); else if(bmi>=30)M('肥胖',-2.5); else if(bmi>=27)M('體重過重',-1); else if(bmi>=18.5)M('健康體重',0.5); else M('體重過輕',-1); }
+  M('飲食品質',[0,-2.5,-1,0,1,2.5][p.diet]);
+  if(p.sleep!=null){ if(p.sleep>=7&&p.sleep<=9)M('充足睡眠',0.5); else if(p.sleep<6)M('睡眠不足',-2); else if(p.sleep>9)M('睡眠過長',-1); }
+  if(p.sbp){ if(p.sbp>=160)M('嚴重高血壓',-3); else if(p.sbp>=140)M('高血壓',-1.5); else if(p.sbp>=130)M('血壓偏高',-0.5); else M('血壓正常',0.5); }
+  if(p.alcohol!=null){ if(p.alcohol>14)M('過量飲酒',-2); else if(p.alcohol>7)M('中量飲酒',-0.5); }
+  M('壓力管理',[0,0.3,0,-0.3,-0.8,-1.5][p.stress]);
+  if(p.glucose&&p.glucose>=126)M('血糖偏高/糖尿',-3);
+  if(whtr&&whtr>=0.6)M('腹部肥胖',-1.5);
+  let life=base; mods.forEach(m=>life+=m.years);
+  life=clamp(life,base-14,base+9);
+  life=Math.round(life*10)/10;
+  const potential = Math.abs(mods.filter(m=>m.years<0).reduce((a,m)=>a+m.years,0));
+
+  return {bmi,whtr,bmr:bmr?Math.round(bmr):null,tdee:tdee?Math.round(tdee):null,
+    sub,score,bio,chrono:p.age,life,lifeMods:mods,potential:Math.round(potential*10)/10,
+    risks:computeRisks(p,bmi,whtr)};
+}
+
+/* 風險分級 */
+function computeRisks(p,bmi,whtr){
+  // 心血管（簡化積分）
+  let cvd=0;
+  if(p.age){ if(p.age>=70)cvd+=4; else if(p.age>=60)cvd+=3; else if(p.age>=50)cvd+=2; else if(p.age>=40)cvd+=1; }
+  if(p.sex==='male')cvd+=1;
+  if(p.smoke==='current')cvd+=2; else if(p.smoke==='former')cvd+=1;
+  if(p.sbp){ if(p.sbp>=160)cvd+=3; else if(p.sbp>=140)cvd+=2; else if(p.sbp>=130)cvd+=1; }
+  if(p.chol&&p.hdl){ const r=p.chol/p.hdl; if(r>=5)cvd+=2; else if(r>=4)cvd+=1; }
+  else if(p.chol&&p.chol>=240)cvd+=1;
+  if(p.glucose&&p.glucose>=126)cvd+=2; else if(p.glucose>=100)cvd+=1;
+  if(bmi&&bmi>=30)cvd+=1;
+  if(p.exercise===0)cvd+=1;
+  if(p.fhHeart)cvd+=1;
+  const cvdLevel = cvd>=8?'vhigh':cvd>=5?'high':cvd>=3?'mod':'low';
+
+  // 糖尿病（FINDRISC 風格）
+  let dm=0;
+  if(p.age){ if(p.age>=65)dm+=4; else if(p.age>=55)dm+=3; else if(p.age>=45)dm+=2; }
+  if(bmi){ if(bmi>=30)dm+=3; else if(bmi>=25)dm+=1; }
+  if(whtr){ if(whtr>=0.6)dm+=4; else if(whtr>=0.55)dm+=3; else if(whtr>=0.5)dm+=1; }
+  else if(p.waist){ const m=p.sex==='male'; if(p.waist>=(m?102:88))dm+=4; else if(p.waist>=(m?94:80))dm+=3; }
+  if(p.exercise<150)dm+=2;
+  if(p.diet<=2)dm+=1;
+  if(p.glucose){ if(p.glucose>=126)dm+=5; else if(p.glucose>=100)dm+=3; }
+  if(p.fhDiabetes)dm+=3;
+  const dmLevel = dm>=12?'vhigh':dm>=8?'high':dm>=5?'mod':'low';
+
+  // 代謝症候群（5 項）
+  const m=p.sex==='male';
+  const mets=[
+    {label:'腰圍', hit: p.waist? p.waist>=(m?90:80):null, val:p.waist?p.waist+' cm':'—'},
+    {label:'血壓', hit: p.sbp? (p.sbp>=130||(p.dbp&&p.dbp>=85)):null, val:p.sbp?(p.sbp+'/'+(p.dbp||'?')):'—'},
+    {label:'空腹血糖', hit: p.glucose? p.glucose>=100:null, val:p.glucose?p.glucose+' mg/dL':'—'},
+    {label:'HDL', hit: p.hdl? p.hdl<(m?40:50):null, val:p.hdl?p.hdl+' mg/dL':'—'},
+    {label:'總膽固醇', hit: p.chol? p.chol>=200:null, val:p.chol?p.chol+' mg/dL':'—'}
+  ];
+  const metsCount = mets.filter(x=>x.hit===true).length;
+  const metsLevel = metsCount>=3?'high':metsCount>=2?'mod':'low';
+
+  return {cvd:{score:cvd,level:cvdLevel},dm:{score:dm,level:dmLevel},mets:{list:mets,count:metsCount,level:metsLevel}};
+}
+
+/* ============ 執行評估 ============ */
+function runAssessment(){
+  const p=readProfile();
+  if(!p.age||!p.height||!p.weight){ toast('請至少填入 年齡 / 身高 / 體重'); return; }
+  const r=compute(p);
+  state.profile=p; state.result={...r,date:new Date().toISOString()};
+  save();
+  toast('✅ 健康預測完成！');
+  go('dash');
+}
+
+function loadSample(){
+  const s={sex:'male',age:45,height:172,weight:82,waist:96,hr:74,sbp:134,dbp:86,glucose:104,chol:212,hdl:44,
+    smoke:'former',exercise:60,alcohol:9,sleep:6,sitting:9,diet:2,stress:4,fhHeart:true,fhDiabetes:true,fhCancer:false};
+  fillProfile(s);toast('已載入範例資料，按「產生健康預測」');
+}
+function saveSnapshot(){
+  const p=readProfile();
+  if(!p.age||!p.height||!p.weight){ toast('請先填入基本數據'); return; }
+  const r=compute(p);
+  state.profile=p; state.result={...r,date:new Date().toISOString()};
+  const snap=buildSnapshot(p,r);
+  state.history.push(snap);
+  if(state.history.length>200)state.history.shift();
+  save();
+  if(state.settings.gas && state.settings.autosync){
+    cloudSaveSnapshot(snap).then(()=>toast('💾 已存並同步雲端')).catch(()=>toast('💾 已存（雲端同步失敗）'));
+  }else{
+    toast('💾 已存為紀錄點');
+  }
+}
+function buildSnapshot(p,r){
+  return {
+    id:'snap_'+Date.now(), date:new Date().toISOString(), source:'app',
+    sex:p.sex, age:p.age, height:p.height, weight:p.weight, waist:p.waist, hr:p.hr,
+    sbp:p.sbp, dbp:p.dbp, glucose:p.glucose, chol:p.chol, hdl:p.hdl,
+    smoke:p.smoke, exercise:p.exercise, alcohol:p.alcohol, sleep:p.sleep, sitting:p.sitting,
+    diet:p.diet, stress:p.stress,
+    bmi:r.bmi?Math.round(r.bmi*10)/10:null, whtr:r.whtr?Math.round(r.whtr*100)/100:null,
+    score:r.score, bio:r.bio, life:r.life,
+    cvdLevel:LEVEL_TXT[r.risks.cvd.level], dmLevel:LEVEL_TXT[r.risks.dm.level], metsCount:r.risks.mets.count
+  };
+}
+
+/* ============ 儀表板渲染 ============ */
+function gradeInfo(s){
+  if(s>=85)return{t:'優異',c:'#10b981'};
+  if(s>=70)return{t:'良好',c:'#0d9488'};
+  if(s>=55)return{t:'普通',c:'#f59e0b'};
+  if(s>=40)return{t:'需改善',c:'#f97316'};
+  return{t:'高風險',c:'#ef4444'};
+}
+const SUB_LABELS={cardio:'心血管',body:'身體組成',activity:'活動量',nutrition:'營養飲食',sleep:'睡眠',substance:'菸酒',mental:'心理壓力',metabolic:'代謝'};
+function barColor(v){return v>=75?'#10b981':v>=55?'#0d9488':v>=40?'#f59e0b':'#ef4444';}
+
+function renderDash(){
+  const r=state.result;
+  document.getElementById('dashEmpty').style.display=r?'none':'block';
+  document.getElementById('dashContent').style.display=r?'block':'none';
+  if(!r)return;
+  document.getElementById('dashDate').textContent='· '+new Date(r.date).toLocaleDateString('zh-TW');
+  const g=gradeInfo(r.score);
+  document.getElementById('scoreNum').textContent=r.score;
+  document.getElementById('scoreNum').style.color=g.c;
+  const gr=document.getElementById('scoreGrade');gr.textContent=g.t;gr.style.background=g.c;
+  drawGauge(r.score,g.c);
+
+  document.getElementById('bioAge').textContent=r.bio;
+  document.getElementById('chronoAge').textContent=r.chrono??'--';
+  const diff=r.chrono?Math.round((r.bio-r.chrono)*10)/10:0;
+  const av=document.getElementById('ageVerdict');
+  if(diff<=-1){av.textContent=`👏 您的身體比實際年齡年輕約 ${Math.abs(diff)} 歲`;av.style.color='#10b981';}
+  else if(diff>=1){av.textContent=`⚠️ 您的身體比實際年齡老化約 ${diff} 歲，可透過改善生活型態逆轉`;av.style.color='#ef4444';}
+  else{av.textContent='生理年齡與實際年齡相當';av.style.color='var(--g600)';}
+
+  document.getElementById('lifeExp').textContent=r.life;
+  document.getElementById('lifeRange').textContent=`${Math.round((r.life-3)*10)/10}–${Math.round((r.life+3)*10)/10}`;
+  document.getElementById('potentialGain').textContent=r.potential;
+
+  document.getElementById('mBmi').innerHTML=r.bmi?r.bmi.toFixed(1):'--';
+  document.getElementById('mWhtr').innerHTML=r.whtr?r.whtr.toFixed(2):'--';
+  document.getElementById('mBp').innerHTML=state.profile.sbp?`${state.profile.sbp}<small>/${state.profile.dbp||'?'}</small>`:'--';
+  document.getElementById('mBmr').innerHTML=r.bmr?r.bmr:'--';
+
+  const bars=document.getElementById('dashBars');bars.innerHTML='';
+  const order=['cardio','body','activity','nutrition','sleep','substance','metabolic','mental'];
+  order.forEach(k=>{
+    const v=Math.round(r.sub[k]);
+    bars.insertAdjacentHTML('beforeend',
+      `<div class="bar-row"><div class="bar-lbl">${SUB_LABELS[k]}</div>
+       <div class="bar-track"><div class="bar-fill" style="width:${v}%;background:${barColor(v)}"></div></div>
+       <div class="bar-val">${v}</div></div>`);
+  });
+}
+
+function drawGauge(score,color){
+  if(charts.gauge)charts.gauge.destroy();
+  charts.gauge=new Chart(document.getElementById('scoreGauge'),{
+    type:'doughnut',
+    data:{datasets:[{data:[score,100-score],backgroundColor:[color,'#e2e8f0'],borderWidth:0}]},
+    options:{rotation:-90,circumference:180,cutout:'75%',plugins:{legend:{display:false},tooltip:{enabled:false}}}
+  });
+}
+
+/* ============ 風險渲染 ============ */
+const LEVEL_TXT={low:'低風險',mod:'中度風險',high:'高風險',vhigh:'極高風險'};
+function renderRisk(){
+  const r=state.result;
+  document.getElementById('riskEmpty').style.display=r?'none':'block';
+  document.getElementById('riskContent').style.display=r?'block':'none';
+  if(!r)return;
+  const cvd=r.risks.cvd,dm=r.risks.dm,mets=r.risks.mets;
+  setPill('cvdPill',cvd.level);
+  document.getElementById('cvdNote').textContent={low:'維持目前良好習慣即可',mod:'建議調整血壓/運動/飲食',high:'建議與醫師討論預防策略',vhigh:'強烈建議儘速就醫評估'}[cvd.level];
+  setPill('dmPill',dm.level);
+  document.getElementById('dmNote').textContent={low:'代謝狀況良好',mod:'注意體重與糖分攝取',high:'建議定期監測血糖',vhigh:'建議做糖化血色素檢查'}[dm.level];
+
+  // 因子條列
+  document.getElementById('cvdFactors').innerHTML=factorHTML(state.profile,'cvd');
+  document.getElementById('dmFactors').innerHTML=factorHTML(state.profile,'dm');
+
+  // 代謝症候群
+  const ml=document.getElementById('metsList');ml.innerHTML='';
+  mets.list.forEach(x=>{
+    const icon = x.hit===true?'🔴':x.hit===false?'🟢':'⚪';
+    ml.insertAdjacentHTML('beforeend',
+      `<div class="hb"><div class="hb-l"><span>${icon}</span>${x.label}</div><div style="font-size:.8rem;font-weight:600;color:var(--g600);">${x.val}</div></div>`);
+  });
+  setPill('metsPill',mets.level);
+  document.getElementById('metsCount').textContent=`符合 ${mets.count} / 5 項`;
+
+  drawRadar(r.sub);
+}
+function setPill(id,level){
+  const el=document.getElementById(id);el.className='pill '+level;el.textContent=LEVEL_TXT[level];
+}
+function factorHTML(p,type){
+  const items=[];
+  if(type==='cvd'){
+    if(p.sbp>=130)items.push('血壓偏高');
+    if(p.smoke==='current')items.push('目前吸菸');
+    if(p.chol&&p.hdl&&p.chol/p.hdl>=4)items.push('膽固醇比值偏高');
+    if(p.exercise===0)items.push('缺乏運動');
+    if(p.fhHeart)items.push('家族心臟病史');
+  }else{
+    if(p.waist&&p.height&&p.waist/p.height>=0.5)items.push('腹部肥胖');
+    if(p.glucose>=100)items.push('空腹血糖偏高');
+    if(p.exercise<150)items.push('活動量不足');
+    if(p.fhDiabetes)items.push('家族糖尿病史');
+    if(p.diet<=2)items.push('飲食品質待改善');
+  }
+  if(!items.length)return '<div class="hint">✅ 未偵測到主要風險因子</div>';
+  return '<div style="font-size:.76rem;color:var(--g600);">主要因子：'+items.map(i=>`<span class="pill mod" style="margin:2px;">${i}</span>`).join(' ')+'</div>';
+}
+function drawRadar(sub){
+  if(charts.radar)charts.radar.destroy();
+  const keys=['cardio','body','activity','nutrition','sleep','substance','metabolic','mental'];
+  charts.radar=new Chart(document.getElementById('radarChart'),{
+    type:'radar',
+    data:{labels:keys.map(k=>SUB_LABELS[k]),
+      datasets:[{label:'健康分數',data:keys.map(k=>Math.round(sub[k])),
+        backgroundColor:'rgba(13,148,136,.18)',borderColor:'#0d9488',borderWidth:2,pointBackgroundColor:'#0d9488'}]},
+    options:{scales:{r:{min:0,max:100,ticks:{stepSize:25,font:{size:9}},pointLabels:{font:{size:11}}}},
+      plugins:{legend:{display:false}}}
+  });
+}
+
+/* ============ 建議 ============ */
+function renderAdvice(){
+  const r=state.result;
+  document.getElementById('adviceEmpty').style.display=r?'none':'block';
+  document.getElementById('adviceContent').style.display=r?'block':'none';
+  if(!r)return;
+  const recs=genRecs(state.profile,r);
+  const list=document.getElementById('recList');list.innerHTML='';
+  if(!recs.length){list.innerHTML='<div class="hint">🎉 太棒了！目前各項指標都很健康，請繼續保持。</div>';return;}
+  recs.forEach(rc=>{
+    list.insertAdjacentHTML('beforeend',
+      `<div class="rec p${rc.pri}"><div class="rec-icon">${rc.icon}</div>
+       <div class="rec-body"><div class="rec-title">${rc.title}</div>
+       <div class="rec-desc">${rc.desc}</div>
+       ${rc.gain?`<div class="rec-gain">🕰️ 預估可延壽約 ${rc.gain} 年 / 生理年齡年輕化</div>`:''}</div></div>`);
+  });
+}
+function genRecs(p,r){
+  const recs=[];
+  const bmi=r.bmi;
+  if(p.smoke==='current')recs.push({pri:1,icon:'🚭',title:'戒菸是延壽第一要務',desc:'吸菸平均縮短壽命約 8-10 年。戒菸後 1 年心血管風險即減半，5-10 年可回到接近不吸菸者。可尋求戒菸門診協助。',gain:8});
+  if(p.sbp>=140)recs.push({pri:1,icon:'❤️',title:'控制高血壓',desc:'收縮壓 '+p.sbp+' mmHg 偏高。減鈉（每日<5g 鹽）、規律有氧、減重與充足睡眠可有效降壓；必要時就醫用藥。',gain:2});
+  else if(p.sbp>=130)recs.push({pri:2,icon:'❤️',title:'血壓略高，及早調整',desc:'處於血壓偏高區間。可透過運動、減鈉、減壓提早改善，避免進展為高血壓。',gain:0.5});
+  if(bmi&&bmi>=27)recs.push({pri:1,icon:'⚖️',title:'減重至健康範圍',desc:`目前 BMI ${bmi.toFixed(1)}。減重 5-10% 即可顯著改善血壓、血糖與血脂。目標每週減 0.5kg，結合飲食控制與運動。`,gain:bmi>=30?2.5:1});
+  if(p.exercise<150)recs.push({pri:p.exercise<75?1:2,icon:'🏃',title:'增加運動量',desc:`目前每週約 ${p.exercise||0} 分鐘。建議每週累積 150 分鐘中強度有氧＋2 次肌力訓練，是延壽性價比最高的投資。`,gain:p.exercise===0?1.5:1});
+  if(p.glucose>=100)recs.push({pri:p.glucose>=126?1:2,icon:'🩸',title:'管理血糖',desc:`空腹血糖 ${p.glucose} mg/dL。減少精緻糖與含糖飲料、增加膳食纖維與運動。${p.glucose>=126?'建議就醫做糖化血色素檢查。':''}`,gain:p.glucose>=126?3:1});
+  if(p.diet<=2)recs.push({pri:2,icon:'🥗',title:'提升飲食品質',desc:'增加蔬果（每日 5 份）、全穀、豆類與健康油脂，減少加工紅肉與含糖食品。地中海飲食型態與長壽高度相關。',gain:1.5});
+  if(p.sleep!=null&&(p.sleep<7))recs.push({pri:2,icon:'😴',title:'改善睡眠',desc:`目前約 ${p.sleep} 小時。長期睡眠不足增加心血管與代謝疾病風險。固定作息、睡前遠離螢幕、避免咖啡因。`,gain:1});
+  if(p.alcohol>7)recs.push({pri:2,icon:'🍷',title:'減少飲酒',desc:`每週約 ${p.alcohol} 份。過量飲酒傷肝並增加癌症與心血管風險，建議逐步減量。`,gain:p.alcohol>14?2:0.5});
+  if(p.stress>=4)recs.push({pri:2,icon:'🧘',title:'管理壓力',desc:'長期高壓會提高皮質醇、加速老化。規律運動、正念冥想、充足社交連結與睡眠都有幫助。',gain:1});
+  if(p.sitting>=8)recs.push({pri:3,icon:'🚶',title:'減少久坐',desc:`每日久坐約 ${p.sitting} 小時。每小時起身活動 2-3 分鐘，可降低代謝疾病風險。`,gain:0.5});
+  if(r.whtr&&r.whtr>=0.5)recs.push({pri:2,icon:'📏',title:'縮小腰圍',desc:'腹部脂肪與代謝疾病關聯最強。腰高比控制在 0.5 以下（腰圍<身高一半）為目標。',gain:1});
+  // 排序：優先級 → 延壽年數
+  recs.sort((a,b)=>a.pri-b.pri || (b.gain||0)-(a.gain||0));
+  return recs;
+}
+
+/* ============ AI 顧問 ============ */
+async function askAI(){
+  const s=state.settings, r=state.result, p=state.profile;
+  if(!r){toast('請先完成健康評估');return;}
+  const key = s.engine==='openai'?s.openai : s.engine==='gemini'?s.gemini : (s.gemini||s.openai);
+  if(!s.gemini&&!s.openai){toast('請先到「設定」填入 API Key');go('settings');return;}
+  const btn=document.getElementById('aiBtn');btn.disabled=true;btn.textContent='思考中…';
+  const out=document.getElementById('aiOut');out.style.display='block';out.textContent='AI 正在分析您的健康摘要…';
+  const summary=`性別:${p.sex==='male'?'男':'女'} 年齡:${p.age} BMI:${r.bmi?r.bmi.toFixed(1):'NA'} 腰高比:${r.whtr?r.whtr.toFixed(2):'NA'} 血壓:${p.sbp||'NA'}/${p.dbp||'NA'} 靜止心率:${p.hr||'NA'} 空腹血糖:${p.glucose||'NA'} 吸菸:${p.smoke} 每週運動:${p.exercise||0}分 睡眠:${p.sleep||'NA'}時 飲食品質:${p.diet}/5 壓力:${p.stress}/5 綜合健康分:${r.score} 生理年齡:${r.bio} 預期壽命估:${r.life}`;
+  const prompt=`你是專業且親切的健康管理顧問。以下是使用者的健康摘要（去識別化）：\n${summary}\n\n請用繁體中文提供：1) 最需優先改善的 3 個重點與具體可執行做法 2) 一週可實踐的行動計畫 3) 鼓勵語。請以衛教口吻，明確提醒此為參考建議、非醫療診斷，如有異常數值應就醫。控制在 400 字內，使用條列。`;
+  try{
+    let text;
+    const useGemini = s.engine==='gemini' || (s.engine==='auto'&&s.gemini);
+    if(useGemini && s.gemini){ text=await callGemini(s.gemini,prompt); }
+    else if(s.openai){ text=await callOpenAI(s.openai,prompt); }
+    else { text=await callGemini(s.gemini,prompt); }
+    out.textContent=text;
+  }catch(e){ out.textContent='⚠️ AI 呼叫失敗：'+e.message+'\n請確認 API Key 是否正確、額度是否足夠。'; }
+  btn.disabled=false;btn.textContent='✨ 產生 AI 健康建議';
+}
+async function callGemini(key,prompt){
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const d=await res.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||'（無回應內容）';
+}
+async function callOpenAI(key,prompt){
+  const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:prompt}],temperature:0.7})});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const d=await res.json();
+  return d.choices?.[0]?.message?.content||'（無回應內容）';
+}
+
+/* ============ 趨勢 ============ */
+const TREND_METRICS=[
+  {k:'score',label:'健康分',color:'#0d9488'},
+  {k:'weight',label:'體重',color:'#0ea5e9'},
+  {k:'bmi',label:'BMI',color:'#8b5cf6'},
+  {k:'sbp',label:'收縮壓',color:'#ef4444'},
+  {k:'glucose',label:'血糖',color:'#f59e0b'},
+  {k:'bio',label:'生理年齡',color:'#f97316'}
+];
+let curTrend='score';
+function renderTrend(){
+  const seg=document.getElementById('trendMetricSeg');seg.innerHTML='';
+  TREND_METRICS.forEach(m=>{
+    const b=document.createElement('div');b.className='seg-btn'+(m.k===curTrend?' on':'');
+    b.textContent=m.label;b.onclick=()=>{curTrend=m.k;renderTrend();};seg.appendChild(b);
+  });
+  const h=state.history;
+  const has=h.length>0;
+  document.getElementById('trendEmpty').style.display=has?'none':'block';
+  document.getElementById('trendContent').style.display=has?'block':'none';
+  document.getElementById('trendTableCard').style.display=has?'block':'none';
+  if(!has)return;
+  const m=TREND_METRICS.find(x=>x.k===curTrend);
+  const pts=h.map(s=>({x:new Date(s.date).toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}),y:s[curTrend]}));
+  if(charts.trend)charts.trend.destroy();
+  charts.trend=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:pts.map(p=>p.x),datasets:[{label:m.label,data:pts.map(p=>p.y),
+      borderColor:m.color,backgroundColor:m.color+'22',fill:true,tension:.3,pointRadius:4,spanGaps:true}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:false}}}
+  });
+  // 表格
+  const t=document.getElementById('trendTable');
+  let html='<tr><th>日期</th><th>健康分</th><th>體重</th><th>BMI</th><th>血壓</th><th>血糖</th><th>生理齡</th></tr>';
+  [...h].reverse().forEach(s=>{
+    html+=`<tr><td>${new Date(s.date).toLocaleDateString('zh-TW')}</td>
+    <td class="num">${s.score??'—'}</td><td class="num">${s.weight??'—'}</td><td class="num">${s.bmi??'—'}</td>
+    <td class="num">${s.sbp?s.sbp+'/'+(s.dbp||'?'):'—'}</td><td class="num">${s.glucose??'—'}</td><td class="num">${s.bio??'—'}</td></tr>`;
+  });
+  t.innerHTML=html;
+}
+function clearHistory(){ if(confirm('確定清除所有趨勢紀錄？')){state.history=[];save();renderTrend();toast('已清除紀錄');} }
+
+/* ============ 每日習慣 ============ */
+function todayKey(){return new Date().toISOString().slice(0,10);}
+function renderHabits(){
+  document.getElementById('habitDate').textContent='· '+new Date().toLocaleDateString('zh-TW');
+  const tk=todayKey();
+  const today=state.habits[tk]||{};
+  const list=document.getElementById('habitList');list.innerHTML='';
+  HABITS.forEach(h=>{
+    const on=!!today[h.id];
+    const streak=calcStreak(h.id);
+    const row=document.createElement('div');row.className='hb';
+    row.innerHTML=`<div class="hb-l"><span class="hb-icon">${h.icon}</span><span>${h.name}</span>
+      ${streak>1?`<span class="streak">🔥${streak}天</span>`:''}</div>`;
+    const chk=document.createElement('div');chk.className='check'+(on?' on':'');chk.textContent='✓';
+    chk.onclick=()=>{
+      if(!state.habits[tk])state.habits[tk]={};
+      state.habits[tk][h.id]=!state.habits[tk][h.id];
+      save();renderHabits();
+    };
+    row.appendChild(chk);list.appendChild(row);
+  });
+  drawHabitChart();
+}
+function calcStreak(id){
+  let s=0;const d=new Date();
+  for(let i=0;i<60;i++){
+    const k=new Date(d.getTime()-i*86400000).toISOString().slice(0,10);
+    if(state.habits[k]&&state.habits[k][id])s++; else if(i>0)break; else if(i===0)continue;
+  }
+  return s;
+}
+function drawHabitChart(){
+  const labels=[],data=[];
+  for(let i=13;i>=0;i--){
+    const d=new Date(Date.now()-i*86400000);const k=d.toISOString().slice(0,10);
+    labels.push(d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}));
+    const day=state.habits[k]||{};
+    const done=HABITS.filter(h=>day[h.id]).length;
+    data.push(Math.round(done/HABITS.length*100));
+  }
+  if(charts.habit)charts.habit.destroy();
+  charts.habit=new Chart(document.getElementById('habitChart'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:data.map(v=>v>=70?'#10b981':v>=40?'#f59e0b':'#e2e8f0')}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}}}}
+  });
+}
+
+/* ============ 設定 & 資料 ============ */
+function refreshAiBadge(){
+  const s=state.settings;const on=s.gemini||s.openai;
+  const b=document.getElementById('aiBadge');
+  b.className='api-badge '+(on?'api-on':'api-off');
+  b.textContent=on?'AI 已啟用':'AI 未設定';
+}
+function saveSettings(){
+  state.settings.gemini=document.getElementById('set-gemini').value.trim();
+  state.settings.openai=document.getElementById('set-openai').value.trim();
+  state.settings.engine=document.getElementById('set-engine').value;
+  state.settings.gas=document.getElementById('set-gas').value.trim();
+  state.settings.autosync=document.getElementById('set-autosync').checked;
+  save();refreshAiBadge();refreshCloudBadge();toast('✅ 設定已儲存');
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='lifespan-health-'+todayKey()+'.json';a.click();
+}
+function importData(e){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{state=Object.assign(defaults(),JSON.parse(rd.result));save();toast('✅ 匯入成功');init();}catch(err){toast('匯入失敗：格式錯誤');}};
+  rd.readAsText(f);e.target.value='';
+}
+function resetAll(){ if(confirm('確定清除所有資料？此動作無法復原。')){localStorage.removeItem(LS_KEY);state=defaults();init();toast('已清除全部資料');} }
+
+/* ============ 初始化 ============ */
+function init(){
+  fillProfile(state.profile);
+  document.getElementById('set-gemini').value=state.settings.gemini||'';
+  document.getElementById('set-openai').value=state.settings.openai||'';
+  document.getElementById('set-engine').value=state.settings.engine||'auto';
+  document.getElementById('set-gas').value=state.settings.gas||'';
+  document.getElementById('set-autosync').checked=!!state.settings.autosync;
+  refreshAiBadge();refreshCloudBadge();
+  renderDash();
+}
+
+/* ============ 雲端後台 ============ */
+function refreshCloudBadge(){
+  const on=!!state.settings.gas;
+  const b=document.getElementById('cloudBadge');
+  b.className='api-badge '+(on?'api-on':'api-off');
+  b.textContent=on?'☁️ 已連線':'☁️ 未連線';
+}
+async function gasGet(action){
+  const url=state.settings.gas+(state.settings.gas.includes('?')?'&':'?')+'action='+action;
+  const res=await fetch(url,{method:'GET',redirect:'follow'});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  return res.json();
+}
+async function gasPost(payload){
+  // 用 text/plain 避免 CORS 預檢；Apps Script 仍能由 e.postData.contents 解析
+  const res=await fetch(state.settings.gas,{method:'POST',redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  return res.json();
+}
+function cloudMsg(t,ok){const el=document.getElementById('cloudMsg');el.textContent=t;el.style.color=ok?'var(--ok)':'var(--err)';}
+async function testCloud(){
+  if(!document.getElementById('set-gas').value.trim()){cloudMsg('請先貼上 Apps Script 網址',false);return;}
+  state.settings.gas=document.getElementById('set-gas').value.trim();save();refreshCloudBadge();
+  cloudMsg('連線中…',true);
+  try{const d=await gasGet('ping');cloudMsg(d.ok?('✅ '+d.message):('⚠️ '+(d.error||'失敗')),d.ok);}
+  catch(e){cloudMsg('⚠️ 連線失敗：'+e.message+'（請確認已部署為「所有人」可存取）',false);}
+}
+async function cloudSaveSnapshot(snap){
+  const d=await gasPost({action:'saveSnapshot',snapshot:snap});
+  if(d.comparison&&d.comparison.hasComparison)state._lastCompare=d.comparison;
+  return d;
+}
+async function cloudPush(){
+  if(!state.settings.gas){cloudMsg('尚未設定雲端網址',false);return;}
+  cloudMsg('上傳中…',true);
+  try{
+    const d=await gasPost({action:'syncAll',snapshots:state.history,profile:state.profile||{}});
+    cloudMsg('✅ '+d.message,true);toast('已上傳雲端');
+  }catch(e){cloudMsg('⚠️ 上傳失敗：'+e.message,false);}
+}
+async function cloudPull(){
+  if(!state.settings.gas){cloudMsg('尚未設定雲端網址',false);return;}
+  cloudMsg('拉取中…',true);
+  try{
+    const d=await gasGet('snapshots');
+    if(d.ok&&d.snapshots){
+      const map={};
+      [...state.history,...d.snapshots].forEach(s=>{if(s&&s.id)map[s.id]=s;});
+      state.history=Object.values(map).sort((a,b)=>new Date(a.date)-new Date(b.date));
+      save();cloudMsg(`✅ 已合併，共 ${state.history.length} 筆紀錄`,true);toast('已從雲端拉取');
+      if(document.getElementById('sec-trend').classList.contains('active'))renderTrend();
+    }else cloudMsg('⚠️ '+(d.error||'無資料'),false);
+  }catch(e){cloudMsg('⚠️ 拉取失敗：'+e.message,false);}
+}
+
+/* ============ 匯入串接（健康存摺 / 穿戴 / App 檔案） ============ */
+let pendingImport=null;
+const LOINC={
+  '8480-6':'sbp','8462-4':'dbp','2339-0':'glucose','2345-7':'glucose','41653-7':'glucose',
+  '2093-3':'chol','2085-9':'hdl','29463-7':'weight','3141-9':'weight',
+  '8302-2':'height','8867-4':'hr','4548-4':'hba1c','4549-2':'hba1c','17856-6':'hba1c'
+};
+const FIELD_LABEL={sbp:'收縮壓',dbp:'舒張壓',glucose:'空腹血糖',chol:'總膽固醇',hdl:'HDL',
+  weight:'體重',height:'身高',hr:'靜止心率',hba1c:'糖化血色素',exercise:'每週運動',sleep:'睡眠'};
+
+function handleImport(e,kind){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      let parsed;
+      if(kind==='nhi')parsed=parseNHI(rd.result);
+      else if(kind==='wearable')parsed=parseWearable(rd.result,f.name);
+      else parsed=parseAppFile(rd.result,f.name);
+      if(!parsed||!Object.keys(parsed.fields).length){toast('未從檔案擷取到可用數值');return;}
+      pendingImport={kind,fields:parsed.fields,notes:parsed.notes||[]};
+      renderImportResult();go('connect');toast('✅ 解析完成');
+    }catch(err){toast('解析失敗：'+err.message);}
+  };
+  rd.readAsText(f);e.target.value='';
+}
+function toNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
+function pushField(map,key,val){const n=toNum(val);if(n!==null)map[key]=n;}
+
+// 健康存摺：FHIR Bundle 或一般 JSON
+function parseNHI(txt){
+  const data=JSON.parse(txt);
+  const fields={};const notes=[];
+  const takeObs=(res)=>{
+    if(!res||res.resourceType!=='Observation')return;
+    const codes=(res.code&&res.code.coding)||[];
+    let key=null;
+    codes.forEach(c=>{if(LOINC[c.code])key=LOINC[c.code];});
+    // 血壓組合
+    if(res.component){
+      res.component.forEach(comp=>{
+        const cc=(comp.code&&comp.code.coding)||[];
+        cc.forEach(c=>{if(LOINC[c.code]&&comp.valueQuantity)pushField(fields,LOINC[c.code],comp.valueQuantity.value);});
+      });
+    }
+    if(key&&res.valueQuantity)pushField(fields,key,res.valueQuantity.value);
+  };
+  if(data.resourceType==='Bundle'&&Array.isArray(data.entry)){
+    data.entry.forEach(en=>takeObs(en.resource));
+    notes.push('來源：FHIR Bundle（'+data.entry.length+' 筆資源）');
+  }else if(Array.isArray(data)){
+    data.forEach(takeObs);
+    // 也嘗試扁平鍵
+    data.forEach(o=>mapFlat(o,fields));
+  }else{
+    takeObs(data);mapFlat(data,fields);
+    notes.push('來源：JSON');
+  }
+  return {fields,notes};
+}
+// 扁平 JSON 常見鍵對應
+function mapFlat(o,fields){
+  const alias={sbp:['sbp','systolic','收縮壓'],dbp:['dbp','diastolic','舒張壓'],
+    glucose:['glucose','血糖','fasting_glucose'],chol:['chol','cholesterol','總膽固醇'],
+    hdl:['hdl','HDL'],weight:['weight','體重','kg'],height:['height','身高'],
+    hr:['hr','heart_rate','心率','restingHeartRate'],hba1c:['hba1c','a1c','糖化血色素']};
+  Object.keys(alias).forEach(k=>{alias[k].forEach(a=>{if(o[a]!==undefined)pushField(fields,k,o[a]);});});
+}
+// 穿戴裝置：Apple 健康 export.xml 或 Google Fit JSON
+function parseWearable(txt,name){
+  const fields={};const notes=[];
+  if(txt.trim().startsWith('<')){ // Apple Health XML
+    const doc=new DOMParser().parseFromString(txt,'application/xml');
+    const recs=[...doc.getElementsByTagName('Record')];
+    let stepsTotal=0,stepDays={},hrVals=[],sleepSecs=0,sleepDays={};
+    recs.forEach(r=>{
+      const t=r.getAttribute('type')||'';const v=parseFloat(r.getAttribute('value'));
+      const day=(r.getAttribute('startDate')||'').slice(0,10);
+      if(t.includes('StepCount')&&!isNaN(v)){stepsTotal+=v;stepDays[day]=1;}
+      else if(t.includes('RestingHeartRate')&&!isNaN(v))hrVals.push(v);
+      else if(t.includes('HeartRate')&&!isNaN(v)&&hrVals.length<2000)hrVals.push(v);
+      else if(t.includes('SleepAnalysis')){
+        const s=new Date(r.getAttribute('startDate')),e=new Date(r.getAttribute('endDate'));
+        if(!isNaN(s)&&!isNaN(e)){sleepSecs+=(e-s)/1000;sleepDays[day]=1;}
+      }
+    });
+    const nDays=Math.max(1,Object.keys(stepDays).length);
+    // 步數 → 週運動量估算：每日步數/1000 ≈ 10 分鐘中強度
+    const avgSteps=stepsTotal/nDays;
+    const weeklyMin=Math.round(avgSteps/1000*10*7);
+    if(weeklyMin>0){fields.exercise=Math.min(weeklyMin,1200);notes.push('平均每日 '+Math.round(avgSteps)+' 步 → 估每週運動 '+fields.exercise+' 分');}
+    if(hrVals.length){fields.hr=Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length);notes.push('平均心率 '+fields.hr+' bpm（'+hrVals.length+' 筆）');}
+    const sleepDayN=Math.max(1,Object.keys(sleepDays).length);
+    if(sleepSecs>0){fields.sleep=Math.round(sleepSecs/3600/sleepDayN*10)/10;notes.push('平均睡眠 '+fields.sleep+' 小時/日');}
+  }else{ // Google Fit / 一般 JSON
+    const data=JSON.parse(txt);
+    const arr=Array.isArray(data)?data:(data.bucket||data.dataset||data.point||[data]);
+    let steps=0,hrs=[],days=new Set();
+    JSON.stringify(data).replace(/"fpVal":([\d.]+)/g,(m,v)=>{hrs.push(parseFloat(v));return m;});
+    (Array.isArray(arr)?arr:[]).forEach(b=>{
+      const s=b.steps||b.stepCount||(b.value&&b.value.intVal);
+      if(s)steps+=parseFloat(s);
+      if(b.date)days.add(b.date);
+    });
+    if(steps>0){const d=Math.max(1,days.size||7);fields.exercise=Math.min(Math.round(steps/d/1000*10*7),1200);notes.push('步數估每週運動 '+fields.exercise+' 分');}
+    mapFlat(data,fields);
+  }
+  return {fields,notes};
+}
+// App / 附件 JSON 或 CSV
+function parseAppFile(txt,name){
+  const fields={};const notes=[];
+  if(name.toLowerCase().endsWith('.csv')||(!txt.trim().startsWith('{')&&!txt.trim().startsWith('['))){
+    const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2)throw new Error('CSV 需含標題與至少一列資料');
+    const head=lines[0].split(',').map(h=>h.trim());
+    const last=lines[lines.length-1].split(',');
+    const rowObj={};head.forEach((h,i)=>rowObj[h]=last[i]);
+    mapFlat(rowObj,fields);
+    notes.push('來源：CSV（取最後一列）');
+  }else{
+    const data=JSON.parse(txt);
+    // 支援本 App 匯出格式（含 profile）
+    if(data.profile){Object.assign(fields,pickProfileFields(data.profile));notes.push('偵測到 LifeSpan 匯出檔');}
+    else if(Array.isArray(data)){mapFlat(data[data.length-1]||{},fields);}
+    else mapFlat(data,fields);
+  }
+  return {fields,notes};
+}
+function pickProfileFields(p){
+  const f={};['sbp','dbp','glucose','chol','hdl','weight','height','hr'].forEach(k=>{if(p[k]!=null)f[k]=p[k];});
+  return f;
+}
+function renderImportResult(){
+  const card=document.getElementById('importResultCard');
+  if(!pendingImport){card.style.display='none';return;}
+  card.style.display='block';
+  const el=document.getElementById('importResult');
+  const rows=Object.keys(pendingImport.fields).map(k=>
+    `<div class="hb"><div class="hb-l">${FIELD_LABEL[k]||k}</div><div style="font-weight:700;color:var(--pri);">${pendingImport.fields[k]}</div></div>`).join('');
+  el.innerHTML=(rows||'<div class="hint">無數值</div>')+
+    (pendingImport.notes.length?'<div class="hint" style="margin-top:8px;">'+pendingImport.notes.map(n=>'· '+n).join('<br>')+'</div>':'');
+}
+function applyImport(){
+  if(!pendingImport)return;
+  const f=pendingImport.fields;
+  const setV=(id,v)=>{if(v!=null)document.getElementById(id).value=v;};
+  setV('in-sbp',f.sbp);setV('in-dbp',f.dbp);setV('in-glucose',f.glucose);
+  setV('in-chol',f.chol);setV('in-hdl',f.hdl);setV('in-weight',f.weight);
+  setV('in-height',f.height);setV('in-hr',f.hr);setV('in-exercise',f.exercise);setV('in-sleep',f.sleep);
+  // 上傳檢驗值到雲端（若已連線）
+  if(state.settings.gas){
+    const labs=Object.keys(f).map(k=>({metric:k,value:f[k],source:pendingImport.kind,measuredAt:new Date().toISOString()}));
+    gasPost({action:'importLabs',labs}).catch(()=>{});
+  }
+  go('assess');toast('✅ 已帶入評估表，請確認後產生預測');
+}
+init();
+</script>
+</body>
+</html>
