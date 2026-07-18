@@ -35,6 +35,53 @@ const LAB_COLS = ['id', 'importedAt', 'source', 'metric', 'value', 'unit', 'meas
 // 通知信箱（留空則自動用試算表擁有者信箱）
 const NOTIFY_EMAIL = '';
 
+// ── AI 設定 ─────────────────────────────────────
+// 執行一次 setAiConfig('gemini','你的KEY') 或 setAiConfig('openai','sk-...')
+// 金鑰存於 Script Properties，不寫死於程式碼。設定後每日守護信與週報會附 AI 個人化解讀。
+function setAiConfig(provider, key) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('AI_PROVIDER', provider || 'gemini');
+  props.setProperty('AI_KEY', key || '');
+  return '✅ AI 設定完成：' + (provider || 'gemini');
+}
+function getAiConfig() {
+  const props = PropertiesService.getScriptProperties();
+  return { provider: props.getProperty('AI_PROVIDER') || 'gemini', key: props.getProperty('AI_KEY') || '' };
+}
+function callAI(prompt) {
+  const { provider, key } = getAiConfig();
+  if (!key) return '';
+  try {
+    if (provider === 'openai') {
+      const res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        headers: { Authorization: 'Bearer ' + key },
+        payload: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.6 })
+      });
+      const d = JSON.parse(res.getContentText());
+      return d.choices && d.choices[0] ? d.choices[0].message.content : '';
+    } else {
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+      const res = UrlFetchApp.fetch(url, {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const d = JSON.parse(res.getContentText());
+      return d.candidates && d.candidates[0] ? d.candidates[0].content.parts[0].text : '';
+    }
+  } catch (err) { return ''; }
+}
+// 用最新快照 + 警示，產生 AI 個人化解讀與行動計畫
+function aiHealthNarrative(cur, alerts) {
+  const { key } = getAiConfig();
+  if (!key) return '';
+  const summ = `性別:${cur.sex} 年齡:${cur.age} BMI:${cur.bmi} 血壓:${cur.sbp}/${cur.dbp} 空腹血糖:${cur.glucose} 靜止心率:${cur.hr} 吸菸:${cur.smoke} 每週運動:${cur.exercise}分 睡眠:${cur.sleep} 健康分:${cur.score} 生理年齡:${cur.bio} 預期壽命估:${cur.life} 心血管風險:${cur.cvdLevel} 糖尿病風險:${cur.dmLevel}`;
+  const al = alerts.map(a => `[${a.level}] ${a.title}：${a.desc}`).join('\n');
+  const prompt = `你是專業、溫暖的個人健康守護顧問。以下是使用者今日的健康摘要與系統偵測到的警示：\n摘要：${summ}\n警示：\n${al}\n\n請用繁體中文寫一段「今日健康守護解讀」：1) 用同理、不恐嚇的語氣說明最該優先關注的 1-2 件事與原因 2) 給出本週 3 個具體可執行的行動 3) 一句鼓勵。控制在 300 字內，條列清楚。務必提醒此為參考建議、非醫療診斷，危急症狀應立即就醫。`;
+  const out = callAI(prompt);
+  return out ? ('\n──── 🤖 AI 個人化解讀 ────\n' + out + '\n') : '';
+}
+
 // ── 初始化試算表 ────────────────────────────────
 function setupSheets() {
   const rec = ensureSheet(REC_SHEET, REC_COLS);
@@ -195,6 +242,8 @@ function weeklyAutoReport() {
   }
   if (daysSince >= 7) lines.push(`📌 提醒：距上次健康評估已 ${daysSince} 天，建議更新一次數據。`);
   lines.push('');
+  const aiWeekly = aiHealthNarrative(cur, evaluateAlerts(cur, all));
+  if (aiWeekly) lines.push(aiWeekly);
   lines.push('（本週報由 LifeSpan 健康後台自動產生，僅供自我管理參考，非醫療診斷。）');
   const summary = lines.join('\n');
 
@@ -241,6 +290,8 @@ function dailyHealthWatch() {
     lines.push(`　${a.desc}`);
     lines.push(`　👉 建議：${a.action}`, '');
   });
+  const aiText = aiHealthNarrative(cur, alerts);
+  if (aiText) lines.push(aiText);
   lines.push('（本警示由 LifeSpan 健康後台每日自動產生，僅供自我管理參考，非醫療診斷。危急症狀請立即就醫。）');
   const body = lines.join('\n');
 

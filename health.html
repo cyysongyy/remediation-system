@@ -401,9 +401,16 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
     </div>
 
     <div class="card">
-      <div class="ct">🤖 自動化守護 <span class="hint">（需連結雲端後台）</span></div>
+      <div class="ct">🤖 AI 守護解讀 <span class="hint">（選填，需設定 API Key）</span></div>
+      <div class="hint" style="margin-bottom:10px;">把目前的警示與健康摘要交給 AI，取得同理、個人化的解讀與本週行動計畫。</div>
+      <button class="btn bp" id="aiAlertBtn" onclick="aiInterpretAlerts()">✨ AI 解讀今日警示</button>
+      <div id="aiAlertOut" class="ai-out" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="ct">⏰ 自動化守護 <span class="hint">（需連結雲端後台）</span></div>
       <div class="hint" style="line-height:1.7;">
-        連結 <b>health-backend.gs</b> 並執行 <code>setupDailyWatch()</code> 後，系統會<b>每日自動</b>用相同的警示引擎檢查你的最新數據，一旦偵測到危險門檻或惡化趨勢，<b>主動寄 Email 警告</b>與建議；並每週產生健康週報。讓健康系統從「你來查」變成「它來提醒你」。
+        連結 <b>health-backend.gs</b> 並執行 <code>setupDailyWatch()</code> 後，系統會<b>每日自動</b>用相同的警示引擎檢查你的最新數據，一旦偵測到危險門檻或惡化趨勢，<b>主動寄 Email 警告</b>與建議；並每週產生健康週報。設定 <code>setAiConfig()</code> 後，這些自動信會附上 <b>AI 個人化解讀</b>。讓健康系統從「你來查」變成「它來提醒你」。
       </div>
       <div id="watchStatus" style="margin-top:8px;"></div>
     </div>
@@ -1538,6 +1545,27 @@ function selectAllSim(on){
   const applicable=SIM_ACTIONS.filter(a=>a.applies(state.profile,state.result));
   applicable.forEach(a=>simState[a.id]=on);
   buildSimulator(state.profile,state.result);
+}
+
+async function aiInterpretAlerts(){
+  const s=state.settings,r=state.result,p=state.profile;
+  if(!r){toast('請先完成健康評估');return;}
+  if(!s.gemini&&!s.openai){toast('請先到「設定」填入 API Key');go('settings');return;}
+  const alerts=analyzeAlerts(p,r,state.history);
+  const btn=document.getElementById('aiAlertBtn');btn.disabled=true;btn.textContent='思考中…';
+  const out=document.getElementById('aiAlertOut');out.style.display='block';out.textContent='AI 正在解讀你的健康警示…';
+  const summary=`性別:${p.sex==='male'?'男':'女'} 年齡:${p.age} BMI:${r.bmi?r.bmi.toFixed(1):'NA'} 血壓:${p.sbp||'NA'}/${p.dbp||'NA'} 空腹血糖:${p.glucose||'NA'} 靜止心率:${p.hr||'NA'} 吸菸:${p.smoke} 每週運動:${p.exercise||0}分 睡眠:${p.sleep||'NA'} 健康分:${r.score} 生理年齡:${r.bio} 預期壽命估:${r.life} 心血管風險:${LEVEL_TXT[r.risks.cvd.level]} 糖尿病風險:${LEVEL_TXT[r.risks.dm.level]}`;
+  const al=alerts.length?alerts.map(a=>`[${a.level}] ${a.title}：${a.desc}`).join('\n'):'（目前無警示）';
+  const prompt=`你是專業、溫暖的個人健康守護顧問。以下是使用者的健康摘要與系統偵測到的警示：\n摘要：${summary}\n警示：\n${al}\n\n請用繁體中文寫「健康守護解讀」：1) 用同理、不恐嚇的語氣說明最該優先關注的 1-2 件事與原因 2) 給出本週 3 個具體可執行的行動 3) 一句鼓勵。控制在 350 字內，條列清楚。務必提醒此為參考建議、非醫療診斷，危急症狀應立即就醫。`;
+  try{
+    let text;
+    const useGemini=s.engine==='gemini'||(s.engine==='auto'&&s.gemini);
+    if(useGemini&&s.gemini)text=await callGemini(s.gemini,prompt);
+    else if(s.openai)text=await callOpenAI(s.openai,prompt);
+    else text=await callGemini(s.gemini,prompt);
+    out.textContent=text;
+  }catch(e){out.textContent='⚠️ AI 呼叫失敗：'+e.message;}
+  btn.disabled=false;btn.textContent='✨ AI 解讀今日警示';
 }
 init();
 </script>
