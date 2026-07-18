@@ -123,6 +123,7 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
 <div class="hd">
   <h1>🫀 LifeSpan 健康預測</h1>
   <div class="hd-right">
+    <span id="cloudBadge" class="api-badge api-off" onclick="go('settings')" style="cursor:pointer;">☁️ 未連線</span>
     <span id="aiBadge" class="api-badge api-off">AI 未設定</span>
   </div>
 </div>
@@ -130,6 +131,7 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
 <div class="nav">
   <div class="nt active" data-sec="dash">📊 總覽</div>
   <div class="nt" data-sec="assess">📝 健康評估</div>
+  <div class="nt" data-sec="connect">🔗 匯入串接</div>
   <div class="nt" data-sec="risk">🔬 風險預測</div>
   <div class="nt" data-sec="trend">📈 趨勢追蹤</div>
   <div class="nt" data-sec="habit">✅ 每日習慣</div>
@@ -264,6 +266,48 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
   </div>
 </div>
 
+<!-- ========== CONNECT / IMPORT ========== -->
+<div class="sec" id="sec-connect">
+  <div class="disc">🔗 <b>資料串接說明：</b>台灣全民健保基於安全設計，<b>未開放</b>第三方 App 直接讀取。正確流程是：由你本人到 <b>健保快易通／健康存摺</b> 匯出自己的資料（FHIR/JSON），再於此匯入，系統會自動解析檢驗值並帶入評估。所有解析都在你的瀏覽器完成，資料不外傳。</div>
+
+  <div class="card">
+    <div class="ct">🏥 健康存摺（My Health Bank）</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      步驟：健保快易通 App 或 <a class="link" href="https://myhealthbank.nhi.gov.tw/" target="_blank">健康存摺網站</a> → 登入 → 下載／匯出（FHIR 或 JSON）→ 於此上傳。<br>
+      自動擷取：血壓、空腹血糖、糖化血色素、總膽固醇、HDL、體重、身高、心率等。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileFhir').click()">📥 上傳健康存摺檔案</button>
+    <input type="file" id="fileFhir" accept=".json,.txt" style="display:none;" onchange="handleImport(event,'nhi')">
+  </div>
+
+  <div class="card">
+    <div class="ct">⌚ 穿戴裝置 / 健康 App</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      支援 Apple 健康「匯出所有健康資料」(export.xml) 與 Google Fit 匯出 (JSON)。自動彙整：每日步數 → 每週運動量、靜止心率、睡眠時數。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileWear').click()">📥 上傳穿戴裝置匯出檔</button>
+    <input type="file" id="fileWear" accept=".xml,.json" style="display:none;" onchange="handleImport(event,'wearable')">
+  </div>
+
+  <div class="card">
+    <div class="ct">📎 現有 App / 附件資料</div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      匯入其他系統匯出的健康資料檔（JSON 或 CSV）。CSV 標題若含 sbp/dbp/glucose/chol/hdl/weight/height/hr 等欄位會自動對應。
+    </div>
+    <button class="btn bp" onclick="document.getElementById('fileApp').click()">📥 上傳 JSON / CSV</button>
+    <input type="file" id="fileApp" accept=".json,.csv,.txt" style="display:none;" onchange="handleImport(event,'app')">
+  </div>
+
+  <div class="card" id="importResultCard" style="display:none;">
+    <div class="ct">✅ 匯入結果</div>
+    <div id="importResult"></div>
+    <div class="row-btn">
+      <button class="btn bp" onclick="applyImport()">➡️ 帶入健康評估</button>
+      <button class="btn bg" onclick="go('assess')">📝 前往評估表</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== RISK ========== -->
 <div class="sec" id="sec-risk">
   <div id="riskEmpty" class="card empty">
@@ -368,6 +412,20 @@ td.num{font-variant-numeric:tabular-nums;font-weight:600;}
 <!-- ========== SETTINGS ========== -->
 <div class="sec" id="sec-settings">
   <div class="card">
+    <div class="ct">☁️ 雲端後台 <span class="hint">（Google Apps Script + 試算表）</span></div>
+    <div class="hint" style="line-height:1.6;margin-bottom:10px;">
+      連結後可跨裝置雲端同步、自動比對、每週自動產生健康週報（Email）。設定方式見 <b>health-backend.gs</b> 說明。
+    </div>
+    <div class="fg"><label class="fl">Apps Script 部署網址</label><input class="fi" id="set-gas" type="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;margin:8px 0;"><input type="checkbox" id="set-autosync"> 存為紀錄點時自動同步雲端</label>
+    <div class="row-btn">
+      <button class="btn bp" onclick="testCloud()">🔌 測試連線</button>
+      <button class="btn bg" onclick="cloudPush()">⬆️ 上傳全部到雲端</button>
+      <button class="btn bg" onclick="cloudPull()">⬇️ 從雲端拉取</button>
+    </div>
+    <div id="cloudMsg" class="hint" style="margin-top:8px;"></div>
+  </div>
+  <div class="card">
     <div class="ct">🤖 AI 引擎設定 <span class="hint">（選填）</span></div>
     <div class="hint" style="margin-bottom:10px;">設定後可使用「AI 健康顧問」。Key 僅存於您的瀏覽器，直接呼叫 API，不經第三方伺服器。</div>
     <div class="fg"><label class="fl">Google Gemini API Key</label><input class="fi" id="set-gemini" type="password" placeholder="AIzaSy… 或 AQ.Ab8R…"></div>
@@ -421,7 +479,7 @@ function load(){
   try{return JSON.parse(localStorage.getItem(LS_KEY))||defaults();}catch(e){return defaults();}
 }
 function defaults(){
-  return {profile:null, result:null, history:[], habits:{}, settings:{gemini:'',openai:'',engine:'auto'}, dietVal:3, stressVal:3};
+  return {profile:null, result:null, history:[], habits:{}, settings:{gemini:'',openai:'',engine:'auto',gas:'',autosync:false}, dietVal:3, stressVal:3};
 }
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
 
@@ -437,6 +495,7 @@ function go(sec){
   if(sec==='dash')renderDash();
   if(sec==='risk')renderRisk();
   if(sec==='advice')renderAdvice();
+  if(sec==='connect')renderImportResult();
 }
 function toast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
@@ -649,12 +708,27 @@ function saveSnapshot(){
   if(!p.age||!p.height||!p.weight){ toast('請先填入基本數據'); return; }
   const r=compute(p);
   state.profile=p; state.result={...r,date:new Date().toISOString()};
-  const snap={date:new Date().toISOString(),weight:p.weight,bmi:r.bmi?Math.round(r.bmi*10)/10:null,
-    sbp:p.sbp,dbp:p.dbp,hr:p.hr,glucose:p.glucose,score:r.score,bio:r.bio};
+  const snap=buildSnapshot(p,r);
   state.history.push(snap);
   if(state.history.length>200)state.history.shift();
   save();
-  toast('💾 已存為紀錄點');
+  if(state.settings.gas && state.settings.autosync){
+    cloudSaveSnapshot(snap).then(()=>toast('💾 已存並同步雲端')).catch(()=>toast('💾 已存（雲端同步失敗）'));
+  }else{
+    toast('💾 已存為紀錄點');
+  }
+}
+function buildSnapshot(p,r){
+  return {
+    id:'snap_'+Date.now(), date:new Date().toISOString(), source:'app',
+    sex:p.sex, age:p.age, height:p.height, weight:p.weight, waist:p.waist, hr:p.hr,
+    sbp:p.sbp, dbp:p.dbp, glucose:p.glucose, chol:p.chol, hdl:p.hdl,
+    smoke:p.smoke, exercise:p.exercise, alcohol:p.alcohol, sleep:p.sleep, sitting:p.sitting,
+    diet:p.diet, stress:p.stress,
+    bmi:r.bmi?Math.round(r.bmi*10)/10:null, whtr:r.whtr?Math.round(r.whtr*100)/100:null,
+    score:r.score, bio:r.bio, life:r.life,
+    cvdLevel:LEVEL_TXT[r.risks.cvd.level], dmLevel:LEVEL_TXT[r.risks.dm.level], metsCount:r.risks.mets.count
+  };
 }
 
 /* ============ 儀表板渲染 ============ */
@@ -956,7 +1030,9 @@ function saveSettings(){
   state.settings.gemini=document.getElementById('set-gemini').value.trim();
   state.settings.openai=document.getElementById('set-openai').value.trim();
   state.settings.engine=document.getElementById('set-engine').value;
-  save();refreshAiBadge();toast('✅ 設定已儲存');
+  state.settings.gas=document.getElementById('set-gas').value.trim();
+  state.settings.autosync=document.getElementById('set-autosync').checked;
+  save();refreshAiBadge();refreshCloudBadge();toast('✅ 設定已儲存');
 }
 function exportData(){
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
@@ -977,8 +1053,224 @@ function init(){
   document.getElementById('set-gemini').value=state.settings.gemini||'';
   document.getElementById('set-openai').value=state.settings.openai||'';
   document.getElementById('set-engine').value=state.settings.engine||'auto';
-  refreshAiBadge();
+  document.getElementById('set-gas').value=state.settings.gas||'';
+  document.getElementById('set-autosync').checked=!!state.settings.autosync;
+  refreshAiBadge();refreshCloudBadge();
   renderDash();
+}
+
+/* ============ 雲端後台 ============ */
+function refreshCloudBadge(){
+  const on=!!state.settings.gas;
+  const b=document.getElementById('cloudBadge');
+  b.className='api-badge '+(on?'api-on':'api-off');
+  b.textContent=on?'☁️ 已連線':'☁️ 未連線';
+}
+async function gasGet(action){
+  const url=state.settings.gas+(state.settings.gas.includes('?')?'&':'?')+'action='+action;
+  const res=await fetch(url,{method:'GET',redirect:'follow'});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  return res.json();
+}
+async function gasPost(payload){
+  // 用 text/plain 避免 CORS 預檢；Apps Script 仍能由 e.postData.contents 解析
+  const res=await fetch(state.settings.gas,{method:'POST',redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  return res.json();
+}
+function cloudMsg(t,ok){const el=document.getElementById('cloudMsg');el.textContent=t;el.style.color=ok?'var(--ok)':'var(--err)';}
+async function testCloud(){
+  if(!document.getElementById('set-gas').value.trim()){cloudMsg('請先貼上 Apps Script 網址',false);return;}
+  state.settings.gas=document.getElementById('set-gas').value.trim();save();refreshCloudBadge();
+  cloudMsg('連線中…',true);
+  try{const d=await gasGet('ping');cloudMsg(d.ok?('✅ '+d.message):('⚠️ '+(d.error||'失敗')),d.ok);}
+  catch(e){cloudMsg('⚠️ 連線失敗：'+e.message+'（請確認已部署為「所有人」可存取）',false);}
+}
+async function cloudSaveSnapshot(snap){
+  const d=await gasPost({action:'saveSnapshot',snapshot:snap});
+  if(d.comparison&&d.comparison.hasComparison)state._lastCompare=d.comparison;
+  return d;
+}
+async function cloudPush(){
+  if(!state.settings.gas){cloudMsg('尚未設定雲端網址',false);return;}
+  cloudMsg('上傳中…',true);
+  try{
+    const d=await gasPost({action:'syncAll',snapshots:state.history,profile:state.profile||{}});
+    cloudMsg('✅ '+d.message,true);toast('已上傳雲端');
+  }catch(e){cloudMsg('⚠️ 上傳失敗：'+e.message,false);}
+}
+async function cloudPull(){
+  if(!state.settings.gas){cloudMsg('尚未設定雲端網址',false);return;}
+  cloudMsg('拉取中…',true);
+  try{
+    const d=await gasGet('snapshots');
+    if(d.ok&&d.snapshots){
+      const map={};
+      [...state.history,...d.snapshots].forEach(s=>{if(s&&s.id)map[s.id]=s;});
+      state.history=Object.values(map).sort((a,b)=>new Date(a.date)-new Date(b.date));
+      save();cloudMsg(`✅ 已合併，共 ${state.history.length} 筆紀錄`,true);toast('已從雲端拉取');
+      if(document.getElementById('sec-trend').classList.contains('active'))renderTrend();
+    }else cloudMsg('⚠️ '+(d.error||'無資料'),false);
+  }catch(e){cloudMsg('⚠️ 拉取失敗：'+e.message,false);}
+}
+
+/* ============ 匯入串接（健康存摺 / 穿戴 / App 檔案） ============ */
+let pendingImport=null;
+const LOINC={
+  '8480-6':'sbp','8462-4':'dbp','2339-0':'glucose','2345-7':'glucose','41653-7':'glucose',
+  '2093-3':'chol','2085-9':'hdl','29463-7':'weight','3141-9':'weight',
+  '8302-2':'height','8867-4':'hr','4548-4':'hba1c','4549-2':'hba1c','17856-6':'hba1c'
+};
+const FIELD_LABEL={sbp:'收縮壓',dbp:'舒張壓',glucose:'空腹血糖',chol:'總膽固醇',hdl:'HDL',
+  weight:'體重',height:'身高',hr:'靜止心率',hba1c:'糖化血色素',exercise:'每週運動',sleep:'睡眠'};
+
+function handleImport(e,kind){
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      let parsed;
+      if(kind==='nhi')parsed=parseNHI(rd.result);
+      else if(kind==='wearable')parsed=parseWearable(rd.result,f.name);
+      else parsed=parseAppFile(rd.result,f.name);
+      if(!parsed||!Object.keys(parsed.fields).length){toast('未從檔案擷取到可用數值');return;}
+      pendingImport={kind,fields:parsed.fields,notes:parsed.notes||[]};
+      renderImportResult();go('connect');toast('✅ 解析完成');
+    }catch(err){toast('解析失敗：'+err.message);}
+  };
+  rd.readAsText(f);e.target.value='';
+}
+function toNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
+function pushField(map,key,val){const n=toNum(val);if(n!==null)map[key]=n;}
+
+// 健康存摺：FHIR Bundle 或一般 JSON
+function parseNHI(txt){
+  const data=JSON.parse(txt);
+  const fields={};const notes=[];
+  const takeObs=(res)=>{
+    if(!res||res.resourceType!=='Observation')return;
+    const codes=(res.code&&res.code.coding)||[];
+    let key=null;
+    codes.forEach(c=>{if(LOINC[c.code])key=LOINC[c.code];});
+    // 血壓組合
+    if(res.component){
+      res.component.forEach(comp=>{
+        const cc=(comp.code&&comp.code.coding)||[];
+        cc.forEach(c=>{if(LOINC[c.code]&&comp.valueQuantity)pushField(fields,LOINC[c.code],comp.valueQuantity.value);});
+      });
+    }
+    if(key&&res.valueQuantity)pushField(fields,key,res.valueQuantity.value);
+  };
+  if(data.resourceType==='Bundle'&&Array.isArray(data.entry)){
+    data.entry.forEach(en=>takeObs(en.resource));
+    notes.push('來源：FHIR Bundle（'+data.entry.length+' 筆資源）');
+  }else if(Array.isArray(data)){
+    data.forEach(takeObs);
+    // 也嘗試扁平鍵
+    data.forEach(o=>mapFlat(o,fields));
+  }else{
+    takeObs(data);mapFlat(data,fields);
+    notes.push('來源：JSON');
+  }
+  return {fields,notes};
+}
+// 扁平 JSON 常見鍵對應
+function mapFlat(o,fields){
+  const alias={sbp:['sbp','systolic','收縮壓'],dbp:['dbp','diastolic','舒張壓'],
+    glucose:['glucose','血糖','fasting_glucose'],chol:['chol','cholesterol','總膽固醇'],
+    hdl:['hdl','HDL'],weight:['weight','體重','kg'],height:['height','身高'],
+    hr:['hr','heart_rate','心率','restingHeartRate'],hba1c:['hba1c','a1c','糖化血色素']};
+  Object.keys(alias).forEach(k=>{alias[k].forEach(a=>{if(o[a]!==undefined)pushField(fields,k,o[a]);});});
+}
+// 穿戴裝置：Apple 健康 export.xml 或 Google Fit JSON
+function parseWearable(txt,name){
+  const fields={};const notes=[];
+  if(txt.trim().startsWith('<')){ // Apple Health XML
+    const doc=new DOMParser().parseFromString(txt,'application/xml');
+    const recs=[...doc.getElementsByTagName('Record')];
+    let stepsTotal=0,stepDays={},hrVals=[],sleepSecs=0,sleepDays={};
+    recs.forEach(r=>{
+      const t=r.getAttribute('type')||'';const v=parseFloat(r.getAttribute('value'));
+      const day=(r.getAttribute('startDate')||'').slice(0,10);
+      if(t.includes('StepCount')&&!isNaN(v)){stepsTotal+=v;stepDays[day]=1;}
+      else if(t.includes('RestingHeartRate')&&!isNaN(v))hrVals.push(v);
+      else if(t.includes('HeartRate')&&!isNaN(v)&&hrVals.length<2000)hrVals.push(v);
+      else if(t.includes('SleepAnalysis')){
+        const s=new Date(r.getAttribute('startDate')),e=new Date(r.getAttribute('endDate'));
+        if(!isNaN(s)&&!isNaN(e)){sleepSecs+=(e-s)/1000;sleepDays[day]=1;}
+      }
+    });
+    const nDays=Math.max(1,Object.keys(stepDays).length);
+    // 步數 → 週運動量估算：每日步數/1000 ≈ 10 分鐘中強度
+    const avgSteps=stepsTotal/nDays;
+    const weeklyMin=Math.round(avgSteps/1000*10*7);
+    if(weeklyMin>0){fields.exercise=Math.min(weeklyMin,1200);notes.push('平均每日 '+Math.round(avgSteps)+' 步 → 估每週運動 '+fields.exercise+' 分');}
+    if(hrVals.length){fields.hr=Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length);notes.push('平均心率 '+fields.hr+' bpm（'+hrVals.length+' 筆）');}
+    const sleepDayN=Math.max(1,Object.keys(sleepDays).length);
+    if(sleepSecs>0){fields.sleep=Math.round(sleepSecs/3600/sleepDayN*10)/10;notes.push('平均睡眠 '+fields.sleep+' 小時/日');}
+  }else{ // Google Fit / 一般 JSON
+    const data=JSON.parse(txt);
+    const arr=Array.isArray(data)?data:(data.bucket||data.dataset||data.point||[data]);
+    let steps=0,hrs=[],days=new Set();
+    JSON.stringify(data).replace(/"fpVal":([\d.]+)/g,(m,v)=>{hrs.push(parseFloat(v));return m;});
+    (Array.isArray(arr)?arr:[]).forEach(b=>{
+      const s=b.steps||b.stepCount||(b.value&&b.value.intVal);
+      if(s)steps+=parseFloat(s);
+      if(b.date)days.add(b.date);
+    });
+    if(steps>0){const d=Math.max(1,days.size||7);fields.exercise=Math.min(Math.round(steps/d/1000*10*7),1200);notes.push('步數估每週運動 '+fields.exercise+' 分');}
+    mapFlat(data,fields);
+  }
+  return {fields,notes};
+}
+// App / 附件 JSON 或 CSV
+function parseAppFile(txt,name){
+  const fields={};const notes=[];
+  if(name.toLowerCase().endsWith('.csv')||(!txt.trim().startsWith('{')&&!txt.trim().startsWith('['))){
+    const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2)throw new Error('CSV 需含標題與至少一列資料');
+    const head=lines[0].split(',').map(h=>h.trim());
+    const last=lines[lines.length-1].split(',');
+    const rowObj={};head.forEach((h,i)=>rowObj[h]=last[i]);
+    mapFlat(rowObj,fields);
+    notes.push('來源：CSV（取最後一列）');
+  }else{
+    const data=JSON.parse(txt);
+    // 支援本 App 匯出格式（含 profile）
+    if(data.profile){Object.assign(fields,pickProfileFields(data.profile));notes.push('偵測到 LifeSpan 匯出檔');}
+    else if(Array.isArray(data)){mapFlat(data[data.length-1]||{},fields);}
+    else mapFlat(data,fields);
+  }
+  return {fields,notes};
+}
+function pickProfileFields(p){
+  const f={};['sbp','dbp','glucose','chol','hdl','weight','height','hr'].forEach(k=>{if(p[k]!=null)f[k]=p[k];});
+  return f;
+}
+function renderImportResult(){
+  const card=document.getElementById('importResultCard');
+  if(!pendingImport){card.style.display='none';return;}
+  card.style.display='block';
+  const el=document.getElementById('importResult');
+  const rows=Object.keys(pendingImport.fields).map(k=>
+    `<div class="hb"><div class="hb-l">${FIELD_LABEL[k]||k}</div><div style="font-weight:700;color:var(--pri);">${pendingImport.fields[k]}</div></div>`).join('');
+  el.innerHTML=(rows||'<div class="hint">無數值</div>')+
+    (pendingImport.notes.length?'<div class="hint" style="margin-top:8px;">'+pendingImport.notes.map(n=>'· '+n).join('<br>')+'</div>':'');
+}
+function applyImport(){
+  if(!pendingImport)return;
+  const f=pendingImport.fields;
+  const setV=(id,v)=>{if(v!=null)document.getElementById(id).value=v;};
+  setV('in-sbp',f.sbp);setV('in-dbp',f.dbp);setV('in-glucose',f.glucose);
+  setV('in-chol',f.chol);setV('in-hdl',f.hdl);setV('in-weight',f.weight);
+  setV('in-height',f.height);setV('in-hr',f.hr);setV('in-exercise',f.exercise);setV('in-sleep',f.sleep);
+  // 上傳檢驗值到雲端（若已連線）
+  if(state.settings.gas){
+    const labs=Object.keys(f).map(k=>({metric:k,value:f[k],source:pendingImport.kind,measuredAt:new Date().toISOString()}));
+    gasPost({action:'importLabs',labs}).catch(()=>{});
+  }
+  go('assess');toast('✅ 已帶入評估表，請確認後產生預測');
 }
 init();
 </script>
