@@ -1611,6 +1611,7 @@ async function startValidate(){
   const progCount=document.getElementById('vProgCount');
   document.getElementById('vProgArea').style.display='block';
   document.getElementById('vResults').innerHTML='';
+  Object.keys(vRecords).forEach(k=>delete vRecords[k]);
   progFill.style.width='0%';
   vItems.filter(x=>x.type==='file'&&x.status!=='error').forEach(f=>f.status='pending');
   const total=groups.length;
@@ -1719,7 +1720,14 @@ const REVIEW_PRINCIPLES={
     '英語':['目標文法：評量重點為該階段教過的句型與單字，避免未學過的高階文法。','情境真實：對話題符合道地英語日常溝通習慣。','聽力測驗：若含聽力，發音標準、語速適齡、音檔與設備清晰。'],
     '社會':['時空正確：地圖、歷史年代、法律名稱與政府組織等須精確且最新。','價值中立：避免個人政治偏見、性別刻板印象、族群歧視或宗教偏向。','圖表判讀：減少純記憶題，增加圖表分析、地理空間辨識與因果推論。'],
     '自然':['概念精確：科學名詞與現象定義嚴謹，避免口語化的錯誤概念。','實驗對照：實驗題檢視操縱變因、控制變因、應變變因設計是否邏輯嚴密。','安全現象：情境須為國小設備可操作、可觀察的真實現象。'],
-    '生活':['圖畫注音：全卷完整注音、圖像占比高、圖意清晰直觀。','跨領域整合：融合音樂、美術、社會、自然，重觀察、體驗與生活常識。','題意簡單：語句簡短，避免雙重否定或複雜邏輯推論句型。']}
+    '生活':['圖畫注音：全卷完整注音、圖像占比高、圖意清晰直觀。','跨領域整合：融合音樂、美術、社會、自然，重觀察、體驗與生活常識。','題意簡單：語句簡短，避免雙重否定或複雜邏輯推論句型。']},
+  // 四、實務審題建議流程（供審題紀錄檢核表列為四輪流程）
+  process:[
+    {round:'第一輪 · 試解與對答案',desc:'不看答案卷，親自做一遍試題，核對解答是否唯一、配分總分是否正好 100 分。'},
+    {round:'第二輪 · 雙向細目表對照',desc:'對照教學進度與雙向細目表，檢視單元配分與 Bloom 認知層次是否均衡。'},
+    {round:'第三輪 · 逐題微觀審查',desc:'依五大通用原則與學科要點，檢查語意、錯別字、圖表、版面與選項誘答性。'},
+    {round:'第四輪 · 回饋與溝通',desc:'填寫審題紀錄檢核表，提供命題教師具體且建構性的修改建議（給修改範例，非僅寫「不妥」）。'}
+  ]
 };
 
 // 將原則知識庫組成可放進 AI prompt 的文字區塊
@@ -1800,7 +1808,9 @@ function vSep(idx){
   return sep;
 }
 
+const vRecords={}; // 暫存每份考卷的審題結果，供匯出審題紀錄檢核表使用
 function appendVResult(group,r,idx){
+  vRecords[idx]={group,r};
   const area=document.getElementById('vResults');
   area.appendChild(vSep(idx));
   const ci=Array.isArray(r.contentIssues)?r.contentIssues:[];
@@ -1864,9 +1874,120 @@ function appendVResult(group,r,idx){
     ${adv.length?`<div class="vsec-t">🧑‍🏫 給老師的命題建議</div>
       <div style="background:#f0fdf4;border-left:4px solid var(--ok);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">
         ${adv.map((a,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:5px;':''}"><span style="flex-shrink:0;">💡</span><span>${esc(a)}</span></div>`).join('')}
-      </div>`:''}`;
+      </div>`:''}
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn bo bsm" onclick="exportReviewRecord(${idx})">📋 匯出審題紀錄檢核表</button>
+    </div>`;
   area.appendChild(div);
   div.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* 匯出「審題紀錄檢核表」：整合四輪審題流程、五大原則檢核與審查發現，
+   產生可列印／存檔的獨立 HTML 檔（含教師簽核欄），供命題回饋與存查。 */
+function exportReviewRecord(idx){
+  const rec=vRecords[idx];
+  if(!rec){alert('找不到此份考卷的審題結果，請重新檢測');return;}
+  const {group,r}=rec;
+  const ci=Array.isArray(r.contentIssues)?r.contentIssues:[];
+  const du=Array.isArray(r.duplicates)?r.duplicates:[];
+  const ip=Array.isArray(r.inappropriate)?r.inappropriate:[];
+  const pc=Array.isArray(r.principleChecks)?r.principleChecks:[];
+  const adv=Array.isArray(r.teacherAdvice)?r.teacherAdvice:[];
+  const total=ci.length+du.length+ip.length;
+  const title=(r.examTitle&&r.examTitle!=='未標示')?r.examTitle:(group[0]?.name||'空白考卷');
+  const today=new Date().toLocaleDateString('zh-TW');
+  const dE=Math.max(0,Number(r.difficulty?.easy)||0),dM=Math.max(0,Number(r.difficulty?.medium)||0),dH=Math.max(0,Number(r.difficulty?.hard)||0);
+  const dSum=dE+dM+dH,dPct=v=>dSum?Math.round(v/dSum*100):0;
+  const stMeta=s=>{s=(s||'').toLowerCase();return s==='fail'?{ic:'❌',lbl:'不符',c:'#991b1b',bg:'#fee2e2'}:s==='warn'?{ic:'⚠️',lbl:'待改善',c:'#92400e',bg:'#fef3c7'}:{ic:'✅',lbl:'符合',c:'#065f46',bg:'#d1fae5'};};
+  const row=(a,b)=>`<tr><td class="k">${a}</td><td>${b}</td></tr>`;
+  const issueBlock=(arr,heading)=>arr.length?`<h3>${heading}（${arr.length}）</h3>`+arr.map(x=>`<div class="iss">
+      <div><strong>${esc(x.location||'位置未標示')}</strong>${x.type?` ｜ <span class="tag">${esc(x.type)}</span>`:''}</div>
+      ${x.text?`<div class="q">原文：「${esc(x.text)}」</div>`:''}
+      <div>${esc(x.description||'')}</div>
+      ${x.suggestion?`<div class="sug">💡 建議：${esc(x.suggestion)}</div>`:''}
+    </div>`).join(''):'';
+  const procRows=REVIEW_PRINCIPLES.process.map(p=>`<tr>
+      <td class="chk">☐</td><td class="k">${esc(p.round)}</td><td>${esc(p.desc)}</td>
+    </tr>`).join('');
+  const pcRows=(pc.length?pc:REVIEW_PRINCIPLES.general.map(g=>({principle:g.name,status:'',finding:''}))).map(p=>{
+    const m=stMeta(p.status);
+    return `<tr><td><span class="pill" style="color:${m.c};background:${m.bg};">${m.ic} ${m.lbl}</span></td>
+      <td class="k">${esc(p.principle||'')}</td><td>${esc(p.finding||'')}</td></tr>`;}).join('');
+  const html=`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>審題紀錄檢核表 － ${esc(title)}</title>
+<style>
+  *{box-sizing:border-box;}
+  body{font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;color:#1f2937;line-height:1.6;max-width:860px;margin:0 auto;padding:28px 22px;}
+  h1{font-size:1.4rem;margin:0 0 4px;text-align:center;}
+  .sub{text-align:center;color:#6b7280;font-size:.85rem;margin-bottom:18px;}
+  h2{font-size:1.02rem;border-left:5px solid #2563eb;padding-left:8px;margin:22px 0 8px;}
+  h3{font-size:.92rem;margin:14px 0 6px;color:#b91c1c;}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  td,th{border:1px solid #d1d5db;padding:6px 9px;vertical-align:top;}
+  td.k{white-space:nowrap;background:#f9fafb;font-weight:600;width:1%;}
+  td.chk{text-align:center;font-size:1.1rem;width:1%;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:11px;font-size:.76rem;font-weight:700;white-space:nowrap;}
+  .iss{border-left:4px solid #ef4444;background:#fef2f2;border-radius:0 6px 6px 0;padding:7px 11px;margin:6px 0;font-size:.84rem;}
+  .iss .q{color:#6b7280;margin:2px 0;}
+  .iss .sug{color:#065f46;margin-top:2px;}
+  .tag{background:#e5e7eb;border-radius:8px;padding:1px 7px;font-size:.76rem;}
+  .adv{background:#f0fdf4;border-left:4px solid #10b981;border-radius:0 6px 6px 0;padding:9px 12px;font-size:.86rem;}
+  .adv div{margin:3px 0;}
+  .bar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:#f3f4f6;margin:6px 0;}
+  .ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:8px 12px;border-radius:8px;font-size:.86rem;}
+  .sign{margin-top:26px;display:flex;gap:40px;font-size:.86rem;}
+  .sign div{flex:1;border-top:1px solid #9ca3af;padding-top:6px;}
+  .foot{margin-top:22px;color:#9ca3af;font-size:.72rem;text-align:center;}
+  @media print{body{padding:0;}.noprint{display:none;}}
+</style></head><body>
+<h1>國小考卷審題紀錄檢核表</h1>
+<div class="sub">依教育測驗與評量理論（內容效度／雙向細目表 · Bloom 認知層次 · 難易度鑑別度 · 素養導向）系統化審題</div>
+<button class="noprint" onclick="window.print()" style="display:block;margin:0 auto 18px;padding:8px 18px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:.9rem;cursor:pointer;">🖨️ 列印 / 存成 PDF</button>
+
+<h2>一、基本資料</h2>
+<table>
+  ${row('考卷名稱',esc(title))}
+  ${row('年級 / 科目',esc(r.grade||'—')+' ／ '+esc(r.subject||'—'))}
+  ${row('檔案',esc(group.map(f=>f.name).join('、')))}
+  ${row('審題日期',esc(today))}
+  ${row('整體評述',esc(r.summary||'—'))}
+  ${row('問題總數',total?('共 '+total+' 項（題目錯誤 '+ci.length+'／重複 '+du.length+'／用語不當 '+ip.length+'）'):'未發現明顯問題')}
+</table>
+
+<h2>二、實務審題四輪流程</h2>
+<table><tbody>${procRows}</tbody></table>
+
+<h2>三、五大通用審題原則檢核</h2>
+<table><thead><tr><th style="width:1%;">判定</th><th style="width:1%;white-space:nowrap;">原則</th><th>發現</th></tr></thead><tbody>${pcRows}</tbody></table>
+
+<h2>四、審查發現</h2>
+${total?(issueBlock(ci,'❌ 題目錯誤')+issueBlock(du,'🔁 重複之處')+issueBlock(ip,'🚫 用語不當')):'<div class="ok">✅ 內容檢核通過：未發現無法作答、重複或用語不當之處。</div>'}
+
+<h2>五、難易度與認知層次</h2>
+${dSum?`<div class="bar">
+  ${dE?`<div style="width:${dPct(dE)}%;background:#6ee7b7;"></div>`:''}
+  ${dM?`<div style="width:${dPct(dM)}%;background:#fde68a;"></div>`:''}
+  ${dH?`<div style="width:${dPct(dH)}%;background:#fca5a5;"></div>`:''}
+</div>
+<div style="font-size:.84rem;color:#4b5563;">🟢 易 ${dPct(dE)}%　🟡 中 ${dPct(dM)}%　🔴 難 ${dPct(dH)}%　（理想常態分配約 3:5:2 或 2:6:2）</div>
+${r.difficulty?.comment?`<div style="margin-top:6px;font-size:.85rem;">${esc(r.difficulty.comment)}</div>`:''}`:'<div style="font-size:.85rem;color:#6b7280;">未提供難易度分析。</div>'}
+
+<h2>六、給命題教師的具體建議</h2>
+${adv.length?`<div class="adv">${adv.map(a=>`<div>💡 ${esc(a)}</div>`).join('')}</div>`:'<div style="font-size:.85rem;color:#6b7280;">—</div>'}
+
+<div class="sign">
+  <div>命題教師簽章 / 日期</div>
+  <div>審題教師簽章 / 日期</div>
+  <div>教學組 / 主任核章</div>
+</div>
+<div class="foot">本表由 Remedial System 依審題原則自動彙整，AI 判讀僅供參考，最終仍須由審題教師專業判斷確認。</div>
+</body></html>`;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+  a.download='審題紀錄_'+(r.subject||'')+'_'+title.replace(/[\\/:*?"<>|]/g,'').slice(0,20)+'_'+new Date().toISOString().slice(0,10)+'.html';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
 
 function appendVError(group,e,idx){
