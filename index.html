@@ -273,8 +273,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
   <div class="sec" id="sec-validate">
     <div class="card">
       <div class="ct">🔍 空白考卷 AI 檢核</div>
-      <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 依<strong>教育測驗與評量理論</strong>（雙向細目表內容效度、Bloom 認知層次、難易度／鑑別度、素養導向）與<strong>五大通用審題原則＋各科專屬重點</strong>系統化檢查<strong>空白考卷</strong>：<br>
-        🧭 五大原則檢核（目標範圍一致性、題幹選項規範性、素養情境合理性、版面閱讀友善度、份量難易配置）<br>
+      <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 依<strong>教育測驗與評量理論</strong>（雙向細目表內容效度、Bloom 認知層次、難易度／鑑別度／信度、素養導向）與<strong>五大通用審題原則＋各科專屬重點</strong>系統化檢查<strong>空白考卷</strong>：<br>
+        🧭 五大原則檢核　🧠 Bloom 認知層次分布　🌱 素養導向評量　📐 測驗品質（難易度／鑑別度／信度）<br>
         ❌ 題目錯誤（無法算出答案、條件矛盾、選項無正確答案）　🔁 重複的題目或選項　🚫 用語不當（性暗示、隱晦暗語／諧音黑話、不雅俚語、偏頗的政治意識形態）<br>
         可一次上傳<strong>多張照片</strong>，預設每張視為一份獨立考卷；若同一份考卷有<strong>多頁</strong>，可在照片之間加「分隔線」把它們圈成同一份，AI 會將整組頁面合併檢測並自動辨識<strong>年級與科目</strong>。<br>
         除了照片，也可直接上傳 <strong>Word（.docx）或 PDF</strong> 檔案，系統會自動擷取文字內容送交 AI 檢測（PDF 若為掃描影像、無法擷取文字，請改用照片上傳）。</div>
@@ -1738,6 +1738,47 @@ function buildPrinciplesBlock(){
   return `【審題理論依據】\n${t}\n\n【五大通用審題原則】\n${g}\n\n【各科專屬審題重點（依你辨識出的科目，套用對應那一列）】\n${s}`;
 }
 
+// Bloom 認知六層次（Anderson & Krathwohl 修訂版）— 由低階到高階，供分布圖呈現
+const BLOOM_LEVELS=[
+  {key:'remember',label:'記憶',color:'#bfdbfe'},
+  {key:'understand',label:'了解',color:'#a7f3d0'},
+  {key:'apply',label:'應用',color:'#fde68a'},
+  {key:'analyze',label:'分析',color:'#fdba74'},
+  {key:'evaluate',label:'評鑑',color:'#fca5a5'},
+  {key:'create',label:'創作',color:'#d8b4fe'}
+];
+
+// 以下三個 render helper 皆輸出 inline-style HTML，供審題卡片與匯出檢核表共用
+function bloomBarHtml(bloom){
+  if(!bloom||typeof bloom!=='object')return '';
+  const vals=BLOOM_LEVELS.map(l=>({...l,v:Math.max(0,Number(bloom[l.key])||0)}));
+  const sum=vals.reduce((a,b)=>a+b.v,0);
+  if(!sum)return bloom.comment?`<div style="font-size:.8rem;color:#4b5563;margin-top:5px;line-height:1.6;">${esc(bloom.comment)}</div>`:'';
+  const pct=v=>Math.round(v/sum*100);
+  const bar=vals.filter(x=>x.v>0).map(x=>`<div title="${x.label} ${pct(x.v)}%" style="width:${pct(x.v)}%;background:${x.color};"></div>`).join('');
+  const legend=vals.map(x=>`<span style="white-space:nowrap;">${x.label} ${pct(x.v)}%</span>`).join('');
+  return `<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#f3f4f6;">${bar}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.72rem;color:#4b5563;margin-top:4px;">${legend}</div>
+    ${bloom.comment?`<div style="font-size:.8rem;color:#4b5563;margin-top:5px;line-height:1.6;">${esc(bloom.comment)}</div>`:''}`;
+}
+function competencyHtml(comp){
+  if(!comp||typeof comp!=='object')return '';
+  const lv=(comp.level||'').toLowerCase();
+  const m=lv==='high'?{ic:'🟢',lbl:'素養導向明確',c:'#065f46',bg:'#d1fae5'}:lv==='low'?{ic:'🔴',lbl:'多為套公式',c:'#991b1b',bg:'#fee2e2'}:{ic:'🟡',lbl:'部分情境化',c:'#92400e',bg:'#fef3c7'};
+  const iss=Array.isArray(comp.issues)?comp.issues:[];
+  const issHtml=iss.map(x=>`<div style="border-left:4px solid #f59e0b;background:#fffbeb;border-radius:0 6px 6px 0;padding:6px 10px;margin:5px 0;font-size:.82rem;">
+    <strong>${esc(x.location||'')}</strong>
+    <div>${esc(x.description||'')}</div>
+    ${x.suggestion?`<div style="color:#065f46;margin-top:2px;">💡 ${esc(x.suggestion)}</div>`:''}
+  </div>`).join('');
+  return `<div><span style="display:inline-block;padding:2px 10px;border-radius:11px;font-size:.76rem;font-weight:700;color:${m.c};background:${m.bg};">${m.ic} ${m.lbl}</span></div>
+    ${comp.comment?`<div style="font-size:.8rem;color:#4b5563;margin-top:5px;line-height:1.6;">${esc(comp.comment)}</div>`:''}${issHtml}`;
+}
+function qualityHtml(q){
+  if(!q||typeof q!=='object'||!q.comment)return '';
+  return `<div style="font-size:.82rem;color:#4b5563;line-height:1.7;background:#f8fafc;border-left:4px solid #64748b;border-radius:0 6px 6px 0;padding:8px 12px;">${esc(q.comment)}</div>`;
+}
+
 async function analyzeBlankPaperGroup(group){
   const multi=group.length>1;
   const imageFiles=group.filter(f=>f.b64);
@@ -1762,8 +1803,11 @@ ${buildPrinciplesBlock()}
 4. 用語不當（此項請從嚴、寧可多報）：性暗示或情色暗示、不雅的俚語或粗俗用語、偏頗的政治意識形態、歧視性或刻板印象字眼、涉及毒品／暴力／自傷等不適合出現在考卷的內容。
    ⚠️ 特別注意「隱晦、間接」的不當用語：以諧音、雙關、暗語、黑話、俚語、拆字或看似無害的組合來間接指涉的情色、性交易或不雅意涵，都必須辨識並標示出來，不能因為字面上「看起來正常」就放過。例如台灣網路黑話中「喝茶／茶／茶莊」常暗指性交易，「摸手」「摸摸」等亦帶有情色暗示，像「茶的摸手」這類組合即屬於隱晦的性暗示，應列為用語不當。判斷時請一併考量台灣與華語圈的網路用語、諧音梗與雙關語境。
 5. 五大原則檢核：逐一評估上述「五大通用審題原則」，每一原則給一個狀態（pass=符合／warn=待改善／fail=不符）與一句具體發現。
-6. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），對照理想常態分配（約 3:5:2 或 2:6:2），並評論難易配置與 Bloom 認知層次分布對此年級是否恰當。
-7. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行、附修改方向的建議（不要只寫「不妥」，要給怎麼改）。
+6. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），對照理想常態分配（約 3:5:2 或 2:6:2），並評論難易配置對此年級是否恰當。
+7. Bloom 認知層次分析（Anderson & Krathwohl 修訂版）：依「記憶→了解→應用→分析→評鑑→創作」判定各題認知層次，估算六個層次各佔的題數比例（六者合計 100），並評論是否符合該年級（低年級記憶、了解比例可較高；高年級應提升應用、分析等高層次題），避免整卷都是死記硬背題。
+8. 素養導向評量分析（108 課綱）：評估整卷是否「情境化、整合運用、跨領域／跨文本」，給一個等級（high=素養導向明確／medium=部分／low=多為套公式為考而考）與評述，並具體指出哪些題屬於「脫離情境、純套公式或純記憶」，附上改寫成真實生活情境的方向。
+9. 測驗品質（古典測驗理論 Item Analysis & Reliability）：綜合評估難易度是否近常態、鑑別度（試題能否區分高低成就學生，避免全班全對或全錯的無鑑別度題）、信度（是否因錯字、歧義、印刷不清造成非能力因素的失分／測量誤差），給一段具體評述。
+10. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行、附修改方向的建議（不要只寫「不妥」，要給怎麼改）。
 
 【務必明確定位＋提供修正（最重要，違反即為不合格）】每一筆問題都要讓老師一眼看出「錯在哪一段文字、為什麼錯、要怎麼改成正確的」：
   - "text"：一律「逐字摘錄」考卷中真正出問題的原文（實際題幹、選項或段落文字），不可只寫題號、不可留空。若照片模糊無法辨識，填「（原文無法辨識）」並說明，不可編造。
@@ -1791,7 +1835,10 @@ ${buildPrinciplesBlock()}
     {"principle":"版面與閱讀友善度","status":"pass","finding":"字體字距、注音、斷行、作答空間是否友善"},
     {"principle":"份量與難易度配置","status":"pass","finding":"題量是否適中、是否由易到難排列"}
   ],
-  "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置與認知層次是否恰當的評論"},
+  "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置是否恰當的評論"},
+  "bloom": {"remember": 35, "understand": 25, "apply": 20, "analyze": 15, "evaluate": 3, "create": 2, "comment": "認知層次分布對此年級是否恰當的評論"},
+  "competency": {"level": "medium", "comment": "整卷情境化／整合運用／跨領域程度的評述", "issues": [{"location":"第6題","description":"純套公式、脫離真實情境","suggestion":"改寫成生活情境的方向，例：以購物找錢情境包裝同一計算"}]},
+  "quality": {"comment": "難易度常態性、鑑別度與信度（錯字／歧義造成的測量誤差）綜合評述"},
   "teacherAdvice": ["給老師的命題建議1（含修改方向）", "建議2"]
 }
 principleChecks 請固定回傳上述五筆、順序不變，只更新 status 與 finding；status 僅能是 "pass"、"warn" 或 "fail"。
@@ -1889,6 +1936,9 @@ function appendVResult(group,r,idx){
         <span>🟢 易 ${dPct(dE)}%</span><span>🟡 中 ${dPct(dM)}%</span><span>🔴 難 ${dPct(dH)}%</span>
       </div>
       ${r.difficulty?.comment?`<div style="font-size:.8rem;color:var(--g600);margin-top:5px;line-height:1.6;">${esc(r.difficulty.comment)}</div>`:''}`:''}
+    ${bloomBarHtml(r.bloom)?`<div class="vsec-t">🧠 Bloom 認知層次分布</div>${bloomBarHtml(r.bloom)}`:''}
+    ${competencyHtml(r.competency)?`<div class="vsec-t">🌱 素養導向評量</div>${competencyHtml(r.competency)}`:''}
+    ${qualityHtml(r.quality)?`<div class="vsec-t">📐 測驗品質（難易度／鑑別度／信度）</div>${qualityHtml(r.quality)}`:''}
     ${adv.length?`<div class="vsec-t">🧑‍🏫 給老師的命題建議</div>
       <div style="background:#f0fdf4;border-left:4px solid var(--ok);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">
         ${adv.map((a,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:5px;':''}"><span style="flex-shrink:0;">💡</span><span>${esc(a)}</span></div>`).join('')}
@@ -1982,7 +2032,7 @@ function exportReviewRecord(idx){
 <h2>四、審查發現</h2>
 ${total?(issueBlock(ci,'❌ 題目錯誤')+issueBlock(du,'🔁 重複之處')+issueBlock(ip,'🚫 用語不當')):'<div class="ok">✅ 內容檢核通過：未發現無法作答、重複或用語不當之處。</div>'}
 
-<h2>五、難易度與認知層次</h2>
+<h2>五、難易度分析（古典測驗理論）</h2>
 ${dSum?`<div class="bar">
   ${dE?`<div style="width:${dPct(dE)}%;background:#6ee7b7;"></div>`:''}
   ${dM?`<div style="width:${dPct(dM)}%;background:#fde68a;"></div>`:''}
@@ -1990,8 +2040,15 @@ ${dSum?`<div class="bar">
 </div>
 <div style="font-size:.84rem;color:#4b5563;">🟢 易 ${dPct(dE)}%　🟡 中 ${dPct(dM)}%　🔴 難 ${dPct(dH)}%　（理想常態分配約 3:5:2 或 2:6:2）</div>
 ${r.difficulty?.comment?`<div style="margin-top:6px;font-size:.85rem;">${esc(r.difficulty.comment)}</div>`:''}`:'<div style="font-size:.85rem;color:#6b7280;">未提供難易度分析。</div>'}
+${bloomBarHtml(r.bloom)?`<div style="margin-top:6px;font-weight:600;font-size:.88rem;">🧠 Bloom 認知層次分布</div>${bloomBarHtml(r.bloom)}`:''}
 
-<h2>六、給命題教師的具體建議</h2>
+<h2>六、素養導向評量（108 課綱）</h2>
+${competencyHtml(r.competency)||'<div style="font-size:.85rem;color:#6b7280;">未提供素養導向分析。</div>'}
+
+<h2>七、測驗品質（難易度／鑑別度／信度）</h2>
+${qualityHtml(r.quality)||'<div style="font-size:.85rem;color:#6b7280;">未提供測驗品質評述。</div>'}
+
+<h2>八、給命題教師的具體建議</h2>
 ${adv.length?`<div class="adv">${adv.map(a=>`<div>💡 ${esc(a)}</div>`).join('')}</div>`:'<div style="font-size:.85rem;color:#6b7280;">—</div>'}
 
 <div class="sign">
