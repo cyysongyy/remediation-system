@@ -1765,15 +1765,21 @@ ${buildPrinciplesBlock()}
 6. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），對照理想常態分配（約 3:5:2 或 2:6:2），並評論難易配置與 Bloom 認知層次分布對此年級是否恰當。
 7. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行、附修改方向的建議（不要只寫「不妥」，要給怎麼改）。
 
+【務必明確定位（最重要）】每一筆問題都必須讓老師一眼看出「錯在哪裡、哪一段文字」：
+  - 每筆問題的 "text" 欄都要「逐字摘錄」考卷中真正出問題的原文（實際的題幹、選項或段落文字），而不是只寫題號。
+  - "description" 要針對那段原文具體說明問題：題目錯誤要指出缺哪個條件／哪裡矛盾／哪個選項沒有正確答案；重複要指出兩處哪幾句／哪些選項相同；用語不當要指出是哪個字詞不當、為何不當。
+  - 嚴禁寫「題意不清」「無法得出唯一答案」「包含不當語言」這類沒有指出實際內容的空泛套語，也嚴禁把下方範例中的示意字（例如「原文摘錄」「問題說明」）原樣填入 text 或 description。
+  - 若因照片模糊、字跡不清而無法辨識原文，請在 "text" 填「（原文無法辨識）」並在 description 說明，不要編造內容。
+
 只回傳 JSON（不要 markdown）：
 {
   "grade": "五年級",
   "subject": "數學",
   "examTitle": "考卷標題（若未標示請填「未標示」）",
   "summary": "一到兩句整體評述",
-  "contentIssues": [{"location":"第3題","type":"無法算出答案","description":"問題說明","suggestion":"修改建議"}],
-  "duplicates": [{"location":"第5題與第12題","description":"重複內容說明","suggestion":"修改建議"}],
-  "inappropriate": [{"location":"第7題","type":"性暗示／隱晦性暗示或黑話／不雅俚語／政治意識形態偏頗／歧視用語","text":"原文摘錄","description":"為何不妥（若為諧音、雙關或暗語請說明其隱含意涵）","suggestion":"建議改寫"}],
+  "contentIssues": [{"location":"第3題","type":"條件不足","text":"逐字摘錄該題原文，例：小明有一些蘋果，平分給同學後每人得幾顆？","description":"針對原文具體指出：未給定蘋果總數與同學人數，缺少可計算的已知條件，故無法求解","suggestion":"補上明確數據，例：小明有 24 顆蘋果，平分給 6 位同學"}],
+  "duplicates": [{"location":"第1題與第11題","text":"逐字摘錄重複的題目或選項原文","description":"具體指出兩題題幹與選項文字完全相同","suggestion":"刪除其一，或將第11題改換情境／數值"}],
+  "inappropriate": [{"location":"第7題","type":"性暗示／隱晦性暗示或黑話／不雅俚語／政治意識形態偏頗／歧視用語","text":"逐字摘錄含不當用語的原文","description":"指出是哪個字詞不當及為何不妥（若為諧音、雙關或暗語請說明其隱含意涵）","suggestion":"建議改寫成的內容"}],
   "principleChecks": [
     {"principle":"目標與範圍一致性","status":"pass","finding":"具體發現，例如各單元配分是否符合節數比重、有無超綱"},
     {"principle":"題幹與選項規範性","status":"warn","finding":"語意是否明確、否定詞是否標示、誘答與答案分布是否恰當"},
@@ -1789,6 +1795,14 @@ principleChecks 請固定回傳上述五筆、順序不變，只更新 status �
 【重要】若問題數量很多，contentIssues、duplicates、inappropriate 三個陣列各自最多列出 8 筆最重要的即可，其餘可在 summary 註明「還有其他較輕微的問題未一一列出」；務必輸出語法正確、完整閉合的 JSON，字串中的换行請用 \\n、雙引號請用 \\" 跳脫。`;
   const raw=await AI.call(prompt,imageFiles.length?imageFiles.map(f=>f.b64):undefined);
   const r=parseAIJson(raw);
+  // 清掉模型偶爾原樣照抄的範例示意字（避免出現「原文：原文摘錄」這種空洞內容）
+  try{
+    const PLACEHOLDERS=['原文摘錄','逐字摘錄','問題說明','重複內容說明','修改建議','建議改寫成的內容','具體發現','原文'];
+    const clean=v=>{if(typeof v!=='string')return v;const t=v.trim();return PLACEHOLDERS.includes(t)?'':v;};
+    ['contentIssues','duplicates','inappropriate'].forEach(k=>{
+      if(Array.isArray(r[k]))r[k].forEach(x=>{if(x&&typeof x==='object'){x.text=clean(x.text);x.description=clean(x.description);x.suggestion=clean(x.suggestion);}});
+    });
+  }catch(err){/* 清理失敗不影響結果 */}
   // 本地敏感詞硬性比對：補強 AI 可能漏抓的隱晦不當用語（僅對可擷取文字的檔案生效）
   try{
     if(!Array.isArray(r.inappropriate))r.inappropriate=[];
