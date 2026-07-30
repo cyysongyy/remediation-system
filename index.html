@@ -273,7 +273,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
   <div class="sec" id="sec-validate">
     <div class="card">
       <div class="ct">🔍 空白考卷 AI 檢核</div>
-      <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 檢查<strong>空白考卷</strong>是否有問題：<br>
+      <div class="al ai" style="font-size:.79rem;">出題後、印製前，先讓 AI 依<strong>教育測驗與評量理論</strong>（雙向細目表內容效度、Bloom 認知層次、難易度／鑑別度、素養導向）與<strong>五大通用審題原則＋各科專屬重點</strong>系統化檢查<strong>空白考卷</strong>：<br>
+        🧭 五大原則檢核（目標範圍一致性、題幹選項規範性、素養情境合理性、版面閱讀友善度、份量難易配置）<br>
         ❌ 題目錯誤（無法算出答案、條件矛盾、選項無正確答案）　🔁 重複的題目或選項　🚫 用語不當（性暗示、隱晦暗語／諧音黑話、不雅俚語、偏頗的政治意識形態）<br>
         可一次上傳<strong>多張照片</strong>，預設每張視為一份獨立考卷；若同一份考卷有<strong>多頁</strong>，可在照片之間加「分隔線」把它們圈成同一份，AI 會將整組頁面合併檢測並自動辨識<strong>年級與科目</strong>。<br>
         除了照片，也可直接上傳 <strong>Word（.docx）或 PDF</strong> 檔案，系統會自動擷取文字內容送交 AI 檢測（PDF 若為掃描影像、無法擷取文字，請改用照片上傳）。</div>
@@ -1673,6 +1674,62 @@ function localSensitiveScan(text,locLabel){
   return hits;
 }
 
+/* ============================================================================
+ * 國小跨學科審題原則知識庫（審題時 App 依循的理論與檢核依據）
+ * ----------------------------------------------------------------------------
+ * 依教育測驗與評量核心理論整理，供 AI 審題與畫面呈現共用：
+ *   一、審題核心理論基礎（內容效度／Bloom 認知層次／古典測驗理論／素養導向）
+ *   二、五大通用審題大原則（逐題與全卷皆適用）
+ *   三、六大科目專屬審題重點（國、數、英、社、自、生活）
+ * 修改審題邏輯時請以此物件為單一事實來源（single source of truth）。
+ * ==========================================================================*/
+const REVIEW_PRINCIPLES={
+  // 一、審題核心理論基礎
+  theory:[
+    {name:'內容效度與雙向細目表',note:'試卷須真實反映教學目標與教材範圍；配分比例應與各單元上課節數／權重成正比，避免過度偏重或忽略重點概念。'},
+    {name:'Bloom 認知領域教育目標分類（修訂版）',note:'認知層次：記憶→了解→應用→分析→評鑑→創作。段考不應全為死記題，需按年級調配理解、應用、分析題比例（低年級記憶理解較高，高年級提升應用分析）。'},
+    {name:'古典測驗理論（難易度／鑑別度／信度）',note:'整卷難易度宜近常態分配（易:中:難 約 3:5:2 或 2:6:2）；題意須明確，避免錯字、歧義造成的測量誤差。'},
+    {name:'素養導向評量（108 課綱）',note:'強調情境化、整合運用與跨領域閱讀理解；宜提供真實或生活化情境，而非純套公式的為考而考。'}
+  ],
+  // 二、五大通用審題大原則（principleChecks 依此順序輸出五筆）
+  general:[
+    {key:'效度', name:'目標與範圍一致性', points:[
+      '範圍合宜：完全涵蓋本次評量範圍，無超綱或跨學期未教內容。',
+      '權重合理：各單元配分比例符合教學節數比重。']},
+    {key:'技術', name:'題幹與選項規範性', points:[
+      '語意明確：題幹清楚完整，無歧義或多重合理答案的漏洞。',
+      '題型適當：多用正面肯定敘述；「非／不正確」等否定字眼應劃底線或加粗提醒。',
+      '誘答有效：選項長度相近、誘答項對應常見迷思，少用「以上皆是／皆非」等無效選項。',
+      '答案隨機：選擇題答案（A/B/C/D）分布均勻，避免同一答案連續過多。']},
+    {key:'素養', name:'素養與情境合理性', points:[
+      '真實情境：情境敘述符合現實邏輯與國小學生生活經驗，無不合常理設定。',
+      '圖表清晰：插圖、地圖、表格、統計圖清晰可辨且為解題必要資訊，非僅裝飾。']},
+    {key:'排版', name:'版面與閱讀友善度', points:[
+      '字體字距：低年級附注音、字體適中、行距充足；無錯別字或簡體字。',
+      '排版順暢：題目與選項不跨頁、不隨意斷行。',
+      '作答空間：填充、問答、計算題留有足夠書寫與演算空間。']},
+    {key:'份量', name:'份量與難易度配置', points:[
+      '時間充裕：題量適中，一般學生可於 40 分鐘內完成並檢查。',
+      '難易梯度：題目由易到難排列，建立作答信心。']}
+  ],
+  // 三、六大科目專屬審題重點
+  subject:{
+    '國語':['文字精確：國字、注音嚴格審查（符合教育部標準字體／標準國語語音）。','閱讀理解：文本題避免過度死記（如作者生卒年、冷門注釋），提升推論與主旨理解。','作文／造句：評分標準（Rubric）與採分點須明確。'],
+    '數學':['題型驗算：審題者須親自實際解題一遍，確認答案唯一且計算無誤。','數字合理：應用題數據符合生活經驗（如一顆蘋果 500 公斤即不合理）。','解法包容：不限定過於僵化的解法，接受多重合理解題路徑。'],
+    '英語':['目標文法：評量重點為該階段教過的句型與單字，避免未學過的高階文法。','情境真實：對話題符合道地英語日常溝通習慣。','聽力測驗：若含聽力，發音標準、語速適齡、音檔與設備清晰。'],
+    '社會':['時空正確：地圖、歷史年代、法律名稱與政府組織等須精確且最新。','價值中立：避免個人政治偏見、性別刻板印象、族群歧視或宗教偏向。','圖表判讀：減少純記憶題，增加圖表分析、地理空間辨識與因果推論。'],
+    '自然':['概念精確：科學名詞與現象定義嚴謹，避免口語化的錯誤概念。','實驗對照：實驗題檢視操縱變因、控制變因、應變變因設計是否邏輯嚴密。','安全現象：情境須為國小設備可操作、可觀察的真實現象。'],
+    '生活':['圖畫注音：全卷完整注音、圖像占比高、圖意清晰直觀。','跨領域整合：融合音樂、美術、社會、自然，重觀察、體驗與生活常識。','題意簡單：語句簡短，避免雙重否定或複雜邏輯推論句型。']}
+};
+
+// 將原則知識庫組成可放進 AI prompt 的文字區塊
+function buildPrinciplesBlock(){
+  const t=REVIEW_PRINCIPLES.theory.map((x,i)=>`  ${i+1}. ${x.name}：${x.note}`).join('\n');
+  const g=REVIEW_PRINCIPLES.general.map((p,i)=>`  原則${i+1}（${p.name}）\n${p.points.map(pt=>`    - ${pt}`).join('\n')}`).join('\n');
+  const s=Object.entries(REVIEW_PRINCIPLES.subject).map(([k,v])=>`  ${k}：${v.join(' ')}`).join('\n');
+  return `【審題理論依據】\n${t}\n\n【五大通用審題原則】\n${g}\n\n【各科專屬審題重點（依你辨識出的科目，套用對應那一列）】\n${s}`;
+}
+
 async function analyzeBlankPaperGroup(group){
   const multi=group.length>1;
   const imageFiles=group.filter(f=>f.b64);
@@ -1685,17 +1742,20 @@ async function analyzeBlankPaperGroup(group){
     :(imageFiles.length
       ?`這是一張「尚未作答的空白考卷」照片，請以審題角度仔細檢查整份考卷內容品質。`
       :`以下是一份「尚未作答的空白考卷」的文字內容（由 Word/PDF 文件擷取），請以審題角度仔細檢查整份考卷內容品質。`);
-  const prompt=`你是台灣中小學考卷審題專家。${sourceDesc}${extraText}
+  const prompt=`你是台灣國小跨學科（國、數、英、社、自、生活）考卷審題專家。請依下列教育測驗與評量理論、五大通用審題原則與各科專屬重點，系統化審查這份考卷。${sourceDesc}${extraText}
+
+${buildPrinciplesBlock()}
 
 【檢查項目】
 1. 辨識這份考卷的「年級」與「科目」（優先以考卷標題為準，無標題則依題目內容推斷）。
-2. 題目錯誤：無法算出答案、條件不足或互相矛盾、答案不唯一、選擇題選項中沒有正確答案、題意不清到無法作答、明顯的文字或數字錯誤。
+2. 題目錯誤：無法算出答案、條件不足或互相矛盾、答案不唯一、選擇題選項中沒有正確答案、題意不清到無法作答、明顯的文字或數字錯誤。若為數學，請「親自實際解題一遍」確認答案唯一且計算無誤。
    ⚠️ 判斷標準請以「是否真的影響學生作答，或是客觀上明確的錯誤」為準。只要一般該年級學生能正確理解題意並作答，就不要列為問題。請勿對用字遣詞的風格偏好、標點、可有可無的贅字、或見仁見智的語感等主觀、吹毛求疵的細節挑錯；寧可放過輕微瑕疵，也不要製造大量瑣碎、非必要的修改建議。
 3. 重複之處：重複出現的題目、同一題內重複的選項、重複的段落或文字。
 4. 用語不當（此項請從嚴、寧可多報）：性暗示或情色暗示、不雅的俚語或粗俗用語、偏頗的政治意識形態、歧視性或刻板印象字眼、涉及毒品／暴力／自傷等不適合出現在考卷的內容。
    ⚠️ 特別注意「隱晦、間接」的不當用語：以諧音、雙關、暗語、黑話、俚語、拆字或看似無害的組合來間接指涉的情色、性交易或不雅意涵，都必須辨識並標示出來，不能因為字面上「看起來正常」就放過。例如台灣網路黑話中「喝茶／茶／茶莊」常暗指性交易，「摸手」「摸摸」等亦帶有情色暗示，像「茶的摸手」這類組合即屬於隱晦的性暗示，應列為用語不當。判斷時請一併考量台灣與華語圈的網路用語、諧音梗與雙關語境。
-5. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），並評論難易配置對此年級是否恰當。
-6. 給老師的命題建議：從題目設計、範圍涵蓋、難易配置、鑑別度、版面編排等角度，給老師 2～5 條具體可行的建議。
+5. 五大原則檢核：逐一評估上述「五大通用審題原則」，每一原則給一個狀態（pass=符合／warn=待改善／fail=不符）與一句具體發現。
+6. 難易度分析：估計整份考卷「易／中／難」題目所佔比例（三者合計 100），對照理想常態分配（約 3:5:2 或 2:6:2），並評論難易配置與 Bloom 認知層次分布對此年級是否恰當。
+7. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行、附修改方向的建議（不要只寫「不妥」，要給怎麼改）。
 
 只回傳 JSON（不要 markdown）：
 {
@@ -1706,9 +1766,17 @@ async function analyzeBlankPaperGroup(group){
   "contentIssues": [{"location":"第3題","type":"無法算出答案","description":"問題說明","suggestion":"修改建議"}],
   "duplicates": [{"location":"第5題與第12題","description":"重複內容說明","suggestion":"修改建議"}],
   "inappropriate": [{"location":"第7題","type":"性暗示／隱晦性暗示或黑話／不雅俚語／政治意識形態偏頗／歧視用語","text":"原文摘錄","description":"為何不妥（若為諧音、雙關或暗語請說明其隱含意涵）","suggestion":"建議改寫"}],
-  "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置是否恰當的評論"},
-  "teacherAdvice": ["給老師的命題建議1", "建議2"]
+  "principleChecks": [
+    {"principle":"目標與範圍一致性","status":"pass","finding":"具體發現，例如各單元配分是否符合節數比重、有無超綱"},
+    {"principle":"題幹與選項規範性","status":"warn","finding":"語意是否明確、否定詞是否標示、誘答與答案分布是否恰當"},
+    {"principle":"素養與情境合理性","status":"pass","finding":"情境是否真實合理、圖表是否清晰且為必要資訊"},
+    {"principle":"版面與閱讀友善度","status":"pass","finding":"字體字距、注音、斷行、作答空間是否友善"},
+    {"principle":"份量與難易度配置","status":"pass","finding":"題量是否適中、是否由易到難排列"}
+  ],
+  "difficulty": {"easy": 40, "medium": 40, "hard": 20, "comment": "難易配置與認知層次是否恰當的評論"},
+  "teacherAdvice": ["給老師的命題建議1（含修改方向）", "建議2"]
 }
+principleChecks 請固定回傳上述五筆、順序不變，只更新 status 與 finding；status 僅能是 "pass"、"warn" 或 "fail"。
 若某類別沒有發現問題，該欄位回傳空陣列 []。
 【重要】若問題數量很多，contentIssues、duplicates、inappropriate 三個陣列各自最多列出 8 筆最重要的即可，其餘可在 summary 註明「還有其他較輕微的問題未一一列出」；務必輸出語法正確、完整閉合的 JSON，字串中的换行請用 \\n、雙引號請用 \\" 跳脫。`;
   const raw=await AI.call(prompt,imageFiles.length?imageFiles.map(f=>f.b64):undefined);
@@ -1738,6 +1806,7 @@ function appendVResult(group,r,idx){
   const ci=Array.isArray(r.contentIssues)?r.contentIssues:[];
   const du=Array.isArray(r.duplicates)?r.duplicates:[];
   const ip=Array.isArray(r.inappropriate)?r.inappropriate:[];
+  const pc=Array.isArray(r.principleChecks)?r.principleChecks:[];
   const total=ci.length+du.length+ip.length;
   const adv=Array.isArray(r.teacherAdvice)?r.teacherAdvice:[];
   const dE=Math.max(0,Number(r.difficulty?.easy)||0),dM=Math.max(0,Number(r.difficulty?.medium)||0),dH=Math.max(0,Number(r.difficulty?.hard)||0);
@@ -1768,6 +1837,16 @@ function appendVResult(group,r,idx){
       </div>
     </div>
     ${r.summary?`<div class="al ai" style="font-size:.8rem;">📋 ${esc(r.summary)}</div>`:''}
+    ${pc.length?`<div class="vsec-t">🧭 五大審題原則檢核</div>`+pc.map(p=>{
+      const st=(p.status||'').toLowerCase();
+      const meta=st==='fail'?{cls:'br2',ic:'❌',lbl:'不符'}:st==='warn'?{cls:'by',ic:'⚠️',lbl:'待改善'}:{cls:'bg',ic:'✅',lbl:'符合'};
+      return `<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--g100);">
+        <span class="bdg ${meta.cls}" style="flex-shrink:0;min-width:66px;text-align:center;">${meta.ic} ${meta.lbl}</span>
+        <div style="flex:1;min-width:0;font-size:.8rem;line-height:1.5;">
+          <strong>${esc(p.principle||'')}</strong>${p.finding?`<div style="color:var(--g600);margin-top:1px;">${esc(p.finding)}</div>`:''}
+        </div>
+      </div>`;
+    }).join(''):''}
     ${ci.length?`<div class="vsec-t">❌ 題目錯誤（${ci.length}）</div>`+ci.map(x=>issueHtml(x,'','br2')).join(''):''}
     ${du.length?`<div class="vsec-t">🔁 重複之處（${du.length}）</div>`+du.map(x=>issueHtml(x,'dup','by')).join(''):''}
     ${ip.length?`<div class="vsec-t">🚫 用語不當（${ip.length}）</div>`+ip.map(x=>issueHtml(x,'lang','bpu')).join(''):''}
