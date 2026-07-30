@@ -1778,6 +1778,15 @@ function qualityHtml(q){
   if(!q||typeof q!=='object'||!q.comment)return '';
   return `<div style="font-size:.82rem;color:#4b5563;line-height:1.7;background:#f8fafc;border-left:4px solid #64748b;border-radius:0 6px 6px 0;padding:8px 12px;">${esc(q.comment)}</div>`;
 }
+// 命題建議：支援新版物件 {advice, example} 與舊版純字串；每條盡量附本卷實例
+function adviceInner(a){
+  if(a&&typeof a==='object'){
+    const adv=esc(a.advice||a.text||'');
+    const ex=esc(a.example||'');
+    return `${adv}${ex?`<div style="color:#6b7280;margin-top:2px;">📖 例：${ex}</div>`:''}`;
+  }
+  return esc(a);
+}
 
 async function analyzeBlankPaperGroup(group){
   const multi=group.length>1;
@@ -1807,7 +1816,7 @@ ${buildPrinciplesBlock()}
 7. Bloom 認知層次分析（Anderson & Krathwohl 修訂版）：依「記憶→了解→應用→分析→評鑑→創作」判定各題認知層次，估算六個層次各佔的題數比例（六者合計 100），並評論是否符合該年級（低年級記憶、了解比例可較高；高年級應提升應用、分析等高層次題），避免整卷都是死記硬背題。
 8. 素養導向評量分析（108 課綱）：評估整卷是否「情境化、整合運用、跨領域／跨文本」，給一個等級（high=素養導向明確／medium=部分／low=多為套公式為考而考）與評述，並具體指出哪些題屬於「脫離情境、純套公式或純記憶」，附上改寫成真實生活情境的方向。
 9. 測驗品質（古典測驗理論 Item Analysis & Reliability）：綜合評估難易度是否近常態、鑑別度（試題能否區分高低成就學生，避免全班全對或全錯的無鑑別度題）、信度（是否因錯字、歧義、印刷不清造成非能力因素的失分／測量誤差），給一段具體評述。
-10. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行、附修改方向的建議（不要只寫「不妥」，要給怎麼改）。
+10. 給老師的命題建議：從雙向細目表配分、範圍涵蓋、認知層次、難易配置、鑑別度、素養情境、版面編排與該科專屬重點等角度，給老師 2～5 條具體可行的建議。每一條都「不可只寫概略綜合建議」，必須從本卷「實際舉出對應的例子」：引用該題題號與原文片段（"example" 欄逐字摘錄），並在 "advice" 說明針對這個例子可以怎麼改（給具體做法或改寫方向）。例如不要只寫「加入更多生活化應用題」，而要寫「第4題『3×8=?』為純計算，可改為生活情境：一排椅子8張，排3排共幾張？」。若某條建議是全卷通則、確實無單一對應題目，example 可留空字串，但其餘建議仍應盡量附例。
 
 【零問題是正常且常見的結果，嚴禁湊題數（第一優先，違反此點最嚴重）】
   - 大多數老師出的考卷都是正確、可作答的。若整份考卷沒有真正的問題，contentIssues、duplicates、inappropriate 就回傳空陣列 []，這是完全正確、也是最常見的結果。
@@ -1850,7 +1859,7 @@ ${buildPrinciplesBlock()}
   "bloom": {"remember": 35, "understand": 25, "apply": 20, "analyze": 15, "evaluate": 3, "create": 2, "comment": "認知層次分布對此年級是否恰當的評論"},
   "competency": {"level": "medium", "comment": "整卷情境化／整合運用／跨領域程度的評述", "issues": [{"location":"第6題","description":"純套公式、脫離真實情境","suggestion":"改寫成生活情境的方向，例：以購物找錢情境包裝同一計算"}]},
   "quality": {"comment": "難易度常態性、鑑別度與信度（錯字／歧義造成的測量誤差）綜合評述"},
-  "teacherAdvice": ["給老師的命題建議1（含修改方向）", "建議2"]
+  "teacherAdvice": [{"advice":"針對下方例子的具體改進做法或改寫方向","example":"從本卷逐字摘錄的對應題號與原文，例：第4題『3×8=?』"}]
 }
 principleChecks 請固定回傳上述五筆、順序不變，只更新 status 與 finding；status 僅能是 "pass"、"warn" 或 "fail"。
 若某類別沒有發現問題，該欄位回傳空陣列 []。
@@ -1954,7 +1963,7 @@ function appendVResult(group,r,idx){
     ${qualityHtml(r.quality)?`<div class="vsec-t">📐 測驗品質（難易度／鑑別度／信度）</div>${qualityHtml(r.quality)}`:''}
     ${adv.length?`<div class="vsec-t">🧑‍🏫 給老師的命題建議</div>
       <div style="background:#f0fdf4;border-left:4px solid var(--ok);border-radius:0 8px 8px 0;padding:9px 12px;font-size:.82rem;line-height:1.7;">
-        ${adv.map((a,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:5px;':''}"><span style="flex-shrink:0;">💡</span><span>${esc(a)}</span></div>`).join('')}
+        ${adv.map((a,i)=>`<div style="display:flex;gap:6px;${i?'margin-top:7px;':''}"><span style="flex-shrink:0;">💡</span><span>${adviceInner(a)}</span></div>`).join('')}
       </div>`:''}
     <div class="btn-row" style="margin-top:12px;">
       <button class="btn bo bsm" onclick="exportReviewRecord(${idx})">📋 匯出審題紀錄檢核表</button>
@@ -2062,7 +2071,7 @@ ${competencyHtml(r.competency)||'<div style="font-size:.85rem;color:#6b7280;">�
 ${qualityHtml(r.quality)||'<div style="font-size:.85rem;color:#6b7280;">未提供測驗品質評述。</div>'}
 
 <h2>八、給命題教師的具體建議</h2>
-${adv.length?`<div class="adv">${adv.map(a=>`<div>💡 ${esc(a)}</div>`).join('')}</div>`:'<div style="font-size:.85rem;color:#6b7280;">—</div>'}
+${adv.length?`<div class="adv">${adv.map(a=>`<div>💡 ${adviceInner(a)}</div>`).join('')}</div>`:'<div style="font-size:.85rem;color:#6b7280;">—</div>'}
 
 <div class="sign">
   <div>命題教師簽章 / 日期</div>
