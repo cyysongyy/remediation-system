@@ -15,6 +15,13 @@
 const SS = SpreadsheetApp.getActiveSpreadsheet();
 const SUBMISSIONS_SHEET = '批改記錄';
 const EXAMS_SHEET = '考卷設定';
+const REVIEWS_SHEET = '審題記錄';
+
+// ★ 欄位定義 — 與 HTML review（審題歷史）物件對齊
+const REVIEW_COLS = [
+  'id', 'reviewedAt', 'grade', 'subject', 'examTitle',
+  'summary', 'issueCount', 'pages', 'thumb', 'analysis'
+];
 
 // ★ 欄位定義 — 與 HTML submission 物件對齊
 const SUB_COLS = [
@@ -46,7 +53,14 @@ function setupSheets() {
     examSheet.getRange(1, 1, 1, EXAM_COLS.length).setFontWeight('bold');
     examSheet.setFrozenRows(1);
   }
-  return { subSheet, examSheet };
+  let reviewSheet = SS.getSheetByName(REVIEWS_SHEET);
+  if (!reviewSheet) {
+    reviewSheet = SS.insertSheet(REVIEWS_SHEET);
+    reviewSheet.getRange(1, 1, 1, REVIEW_COLS.length).setValues([REVIEW_COLS]);
+    reviewSheet.getRange(1, 1, 1, REVIEW_COLS.length).setFontWeight('bold');
+    reviewSheet.setFrozenRows(1);
+  }
+  return { subSheet, examSheet, reviewSheet };
 }
 
 // ── GET 處理 ────────────────────────────────────
@@ -58,9 +72,10 @@ function doGet(e) {
   }
 
   if (action === 'all') {
-    const { subSheet, examSheet } = setupSheets();
+    const { subSheet, examSheet, reviewSheet } = setupSheets();
     const submissions = sheetToObjects(subSheet, SUB_COLS);
     const exams = sheetToObjects(examSheet, EXAM_COLS);
+    const reviews = sheetToObjects(reviewSheet, REVIEW_COLS);
     submissions.forEach(s => {
       try { s.misconceptions = JSON.parse(s.misconceptions || '[]'); } catch { s.misconceptions = []; }
       try { s.wrongQuestions = JSON.parse(s.wrongQuestions || '[]'); } catch { s.wrongQuestions = []; }
@@ -68,7 +83,12 @@ function doGet(e) {
     exams.forEach(ex => {
       try { ex.roster = JSON.parse(ex.roster || '[]'); } catch { ex.roster = []; }
     });
-    return jsonResp({ ok: true, submissions, exams });
+    reviews.forEach(v => {
+      try { v.pages = JSON.parse(v.pages || '[]'); } catch { v.pages = []; }
+      try { v.analysis = JSON.parse(v.analysis || '{}'); } catch { v.analysis = {}; }
+      v.issueCount = Number(v.issueCount) || 0;
+    });
+    return jsonResp({ ok: true, submissions, exams, reviews });
   }
 
   if (action === 'submissions') {
@@ -107,13 +127,23 @@ function doPost(e) {
     return jsonResp({ ok: true, message: '考卷設定已儲存' });
   }
 
+  if (action === 'saveReview') {
+    const rv = body.review;
+    if (!rv?.id) return jsonResp({ ok: false, error: '缺少 review.id' });
+    const { reviewSheet } = setupSheets();
+    upsertRow(reviewSheet, REVIEW_COLS, rv.id, reviewToRow(rv));
+    return jsonResp({ ok: true, message: '審題記錄已儲存' });
+  }
+
   if (action === 'syncAll') {
     const subs = body.submissions || [];
     const exams = body.exams || [];
-    const { subSheet, examSheet } = setupSheets();
+    const reviews = body.reviews || [];
+    const { subSheet, examSheet, reviewSheet } = setupSheets();
     subs.forEach(s => upsertRow(subSheet, SUB_COLS, s.id, subToRow(s)));
     exams.forEach(ex => upsertRow(examSheet, EXAM_COLS, ex.id, examToRow(ex)));
-    return jsonResp({ ok: true, message: `同步完成：${subs.length} 筆記錄，${exams.length} 份考卷` });
+    reviews.forEach(rv => upsertRow(reviewSheet, REVIEW_COLS, rv.id, reviewToRow(rv)));
+    return jsonResp({ ok: true, message: `同步完成：${subs.length} 筆批改記錄，${exams.length} 份考卷，${reviews.length} 筆審題記錄` });
   }
 
   if (action === 'deleteSubmission') {
@@ -121,6 +151,13 @@ function doPost(e) {
     const { subSheet } = setupSheets();
     deleteRow(subSheet, id);
     return jsonResp({ ok: true, message: '記錄已刪除' });
+  }
+
+  if (action === 'deleteReview') {
+    const id = body.id;
+    const { reviewSheet } = setupSheets();
+    deleteRow(reviewSheet, id);
+    return jsonResp({ ok: true, message: '審題記錄已刪除' });
   }
 
   return jsonResp({ ok: false, error: `Unknown action: ${action}` });
@@ -194,5 +231,23 @@ function examToRow(ex) {
     sem:       ex.sem || '',
     createdAt: ex.createdAt || new Date().toLocaleDateString('zh-TW'),
     roster:    JSON.stringify(ex.roster || []),
+  };
+}
+
+// ★ 對應 HTML review（審題歷史）物件欄位。thumb 若過大則不存（試算表單格上限約 5 萬字元）。
+function reviewToRow(rv) {
+  let thumb = rv.thumb || '';
+  if (thumb.length > 48000) thumb = '';
+  return {
+    id:         rv.id || '',
+    reviewedAt: rv.reviewedAt || new Date().toISOString(),
+    grade:      rv.grade || '',
+    subject:    rv.subject || '',
+    examTitle:  rv.examTitle || '',
+    summary:    rv.summary || '',
+    issueCount: rv.issueCount ?? '',
+    pages:      JSON.stringify(rv.pages || []),
+    thumb:      thumb,
+    analysis:   JSON.stringify(rv.analysis || {}),
   };
 }

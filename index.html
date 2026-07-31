@@ -305,6 +305,16 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
       </button>
     </div>
     <div id="vResults"></div>
+    <div class="card">
+      <details id="vHistDetails">
+        <summary style="font-weight:700;font-size:.9rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
+          <span>📚 已儲存的審題紀錄<span id="vHistCount" style="color:var(--g400);font-weight:400;"></span></span>
+          <span style="color:var(--g400);">▾</span>
+        </summary>
+        <div class="al ai" style="font-size:.76rem;margin:8px 0;">審過的每份考卷會自動存成歷史資料（含縮圖與完整分析）。本機隨時可查；若已在「設定」設好 Google 後台，會一併同步到雲端「審題記錄」，可跨裝置查看。</div>
+        <div id="vHistory"></div>
+      </details>
+    </div>
   </div>
 
   <div class="sec active" id="sec-dash">
@@ -1629,6 +1639,7 @@ async function startValidate(){
       const r=await analyzeBlankPaperGroup(usable);
       usable.forEach(f=>f.status='done');
       appendVResult(usable,r,done);
+      saveReview(usable,r); // 存成歷史紀錄（本機＋選配雲端），不阻塞流程
     }catch(e){
       usable.forEach(f=>f.status='error');
       appendVError(usable,e,done);
@@ -1970,6 +1981,112 @@ function appendVResult(group,r,idx){
     </div>`;
   area.appendChild(div);
   div.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ============================================================================
+ * 審題歷史紀錄：把每次上傳審過的考卷（含縮圖與完整分析）存成歷史資料。
+ * 本機存於 localStorage('reviews')；若已設定 GAS 後台則同步至雲端「審題記錄」。
+ * ==========================================================================*/
+// 產生壓縮縮圖（首頁代表圖）以節省儲存空間；文件檔無圖則回傳 null。
+function makeThumb(dataUrl,maxW=220,q=0.55){
+  return new Promise(res=>{
+    if(!dataUrl)return res(null);
+    const img=new Image();
+    img.onload=()=>{try{
+      const scale=Math.min(1,maxW/img.width);
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',q));
+    }catch{res(null);}};
+    img.onerror=()=>res(null);
+    img.src=dataUrl;
+  });
+}
+// 存一筆審題結果為歷史紀錄（本機＋選配雲端）
+async function saveReview(group,r){
+  try{
+    const firstImg=group.find(f=>f.dataUrl);
+    const thumb=firstImg?await makeThumb(firstImg.dataUrl):null;
+    const ci=Array.isArray(r.contentIssues)?r.contentIssues:[];
+    const du=Array.isArray(r.duplicates)?r.duplicates:[];
+    const ip=Array.isArray(r.inappropriate)?r.inappropriate:[];
+    const review={
+      id:'rv_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      reviewedAt:new Date().toISOString(),
+      grade:r.grade||'',subject:r.subject||'',
+      examTitle:(r.examTitle&&r.examTitle!=='未標示')?r.examTitle:(group[0]?.name||'空白考卷'),
+      summary:r.summary||'',
+      issueCount:ci.length+du.length+ip.length,
+      pages:group.map(f=>({name:f.name,kind:f.kind||(f.dataUrl?'img':'doc')})),
+      thumb,
+      analysis:{contentIssues:ci,duplicates:du,inappropriate:ip,
+        principleChecks:r.principleChecks||[],difficulty:r.difficulty||{},
+        bloom:r.bloom||{},competency:r.competency||{},quality:r.quality||{},
+        teacherAdvice:r.teacherAdvice||[]}
+    };
+    let list=DB.get('reviews',[]);
+    list.unshift(review);
+    if(list.length>60)list=list.slice(0,60);
+    // 配額保護：若寫入失敗（localStorage 已滿），逐步丟棄最舊紀錄再試
+    while(list.length){
+      try{DB.set('reviews',list);break;}
+      catch(e){if(list.length<=1){try{delete review.thumb;DB.set('reviews',[review]);}catch{}break;}list=list.slice(0,Math.ceil(list.length*0.7));}
+    }
+    renderReviewHistory();
+    // 雲端同步（選配）：thumb 可能較大，序列化過大時去掉 thumb 再送
+    if(DB.get('gasUrl','')){
+      let payload=review;
+      try{if(JSON.stringify(review).length>45000){payload={...review,thumb:null};}}catch{}
+      gasPost({action:'saveReview',review:payload}).then(()=>setSyncStatus('synced')).catch(()=>{});
+    }
+  }catch(err){/* 儲存失敗不影響審題結果顯示 */}
+}
+// 檢視某筆歷史紀錄：把儲存的分析重新渲染到結果區
+function viewReview(id){
+  const rv=DB.get('reviews',[]).find(x=>x.id===id);
+  if(!rv){alert('找不到此筆紀錄');return;}
+  const area=document.getElementById('vResults');area.innerHTML='';
+  const pseudo=(rv.pages&&rv.pages.length?rv.pages:[{name:rv.examTitle}]).map((p,i)=>({
+    name:p.name||rv.examTitle,kind:p.kind==='img'?undefined:p.kind,
+    dataUrl:(i===0&&rv.thumb)?rv.thumb:undefined
+  }));
+  const r={grade:rv.grade,subject:rv.subject,examTitle:rv.examTitle,summary:rv.summary,...(rv.analysis||{})};
+  appendVResult(pseudo,r,0);
+  document.getElementById('vResults').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function delReview(id){
+  if(!confirm('確定刪除這筆審題紀錄？'))return;
+  DB.set('reviews',DB.get('reviews',[]).filter(x=>x.id!==id));
+  if(DB.get('gasUrl',''))gasPost({action:'deleteReview',id}).catch(()=>{});
+  renderReviewHistory();
+}
+function renderReviewHistory(){
+  const box=document.getElementById('vHistory');if(!box)return;
+  const list=DB.get('reviews',[]);
+  const cntEl=document.getElementById('vHistCount');if(cntEl)cntEl.textContent=list.length?`（${list.length}）`:'';
+  if(!list.length){box.innerHTML=`<div style="font-size:.8rem;color:var(--g400);padding:6px 2px;">尚無審題紀錄。審過的考卷會自動存成歷史資料，可在此檢視或刪除。</div>`;return;}
+  box.innerHTML=list.map(rv=>{
+    const d=new Date(rv.reviewedAt);const ds=isNaN(d)?'':`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const media=rv.thumb?`<img src="${rv.thumb}" style="width:46px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--g200);flex-shrink:0;"/>`:`<div style="width:46px;height:60px;border-radius:6px;border:1px solid var(--g200);background:var(--g100);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">📄</div>`;
+    return `<div style="display:flex;gap:9px;align-items:center;padding:8px 0;border-bottom:1px solid var(--g100);">
+      ${media}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(rv.examTitle)}</div>
+        <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;">
+          ${rv.grade?`<span class="bdg bb">🎓 ${esc(rv.grade)}</span>`:''}
+          ${rv.subject?`<span class="bdg bb">📚 ${esc(rv.subject)}</span>`:''}
+          <span class="bdg ${rv.issueCount?'br2':'bg'}">${rv.issueCount?`⚠️ ${rv.issueCount}`:'✅ 0'}</span>
+          ${rv.pages&&rv.pages.length>1?`<span class="bdg by">📑 ${rv.pages.length}頁</span>`:''}
+        </div>
+        <div style="font-size:.7rem;color:var(--g400);margin-top:3px;">${ds}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+        <button class="btn bo bsm" style="padding:4px 9px;" onclick="viewReview('${rv.id}')">檢視</button>
+        <button class="btn bd bsm" style="padding:4px 9px;" onclick="delReview('${rv.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* 匯出「審題紀錄檢核表」：整合四輪審題流程、五大原則檢核與審查發現，
@@ -2469,6 +2586,7 @@ function showTab(t){
   document.querySelectorAll('.nt').forEach((n,i)=>n.classList.toggle('active',TABS[i]===t));
   document.getElementById('sec-'+t).classList.add('active');
   if(t==='dash')renderDashboard();
+  if(t==='validate')renderReviewHistory();
   if(t==='grade'){renderExamList2();updateRemS();}
   if(t==='cls')renderClsSel();
   if(t==='rem'){updateRemS();renderRemAuto();}
@@ -2492,13 +2610,17 @@ async function pullFromGAS(){
   try{const d=await gasGet('action=all');
     if(d?.submissions?.length){const m={};[...DB.get('submissions',[]),...d.submissions].forEach(s=>{m[s.id]=s;});DB.set('submissions',Object.values(m));}
     if(d?.exams?.length){const m={};[...DB.get('exams',[]),...d.exams].forEach(e=>{m[e.id]=e;});DB.set('exams',Object.values(m));}
-    setSyncStatus('synced');alert(`✅ 同步完成！${d?.submissions?.length||0} 筆記錄`);renderDashboard();
+    if(d?.reviews?.length){const m={};[...d.reviews,...DB.get('reviews',[])].forEach(v=>{m[v.id]=v;});
+      let merged=Object.values(m).sort((a,b)=>new Date(b.reviewedAt)-new Date(a.reviewedAt)).slice(0,60);
+      try{DB.set('reviews',merged);}catch{DB.set('reviews',merged.map(v=>({...v,thumb:null})));}renderReviewHistory();}
+    setSyncStatus('synced');alert(`✅ 同步完成！${d?.submissions?.length||0} 筆批改記錄、${d?.reviews?.length||0} 筆審題記錄`);renderDashboard();
   }catch(e){setSyncStatus('error');alert('同步失敗：'+e.message);}
 }
 async function syncNow(){
   const url=DB.get('gasUrl','');if(!url){alert('請先設定 GAS 網址');return;}
   setSyncStatus('syncing');
-  try{await gasPost({action:'syncAll',submissions:DB.get('submissions',[]),exams:DB.get('exams',[])});setSyncStatus('synced');alert('✅ 同步完成！');}
+  try{const reviews=DB.get('reviews',[]).map(v=>({...v,thumb:JSON.stringify(v).length>45000?null:v.thumb}));
+    await gasPost({action:'syncAll',submissions:DB.get('submissions',[]),exams:DB.get('exams',[]),reviews});setSyncStatus('synced');alert('✅ 同步完成！');}
   catch(e){setSyncStatus('error');alert('失敗：'+e.message);}
 }
 async function testGAS(){
@@ -2574,7 +2696,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   // ★ 預設 GAS URL（若尚未設定）
   const DEFAULT_GAS='https://script.google.com/macros/s/AKfycbyv8GxIx6iJzm6b6Bf0hN0hg8pPpZcCShIvGzOUoB8GFaL3zNlsPbXFLgQRyF_vpLQ_/exec';
   if(!DB.get('gasUrl',''))DB.set('gasUrl',DEFAULT_GAS);
-  loadSettings();renderDashboard();renderExamList2();
+  loadSettings();renderDashboard();renderExamList2();renderReviewHistory();
   setSyncStatus('none');
   document.getElementById('bupZone').addEventListener('dragover',e=>{e.preventDefault();document.getElementById('bupZone').classList.add('drag');});
 });
