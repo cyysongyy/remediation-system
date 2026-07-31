@@ -311,7 +311,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
           <span>📚 已儲存的審題紀錄<span id="vHistCount" style="color:var(--g400);font-weight:400;"></span></span>
           <span style="color:var(--g400);">▾</span>
         </summary>
-        <div class="al ai" style="font-size:.76rem;margin:8px 0;">審過的每份考卷會自動存成歷史資料（含縮圖與完整分析）。本機隨時可查；若已在「設定」設好 Google 後台，會一併同步到雲端「審題記錄」，可跨裝置查看。</div>
+        <div class="al ai" style="font-size:.76rem;margin:8px 0;">審過的每份考卷會自動存成歷史資料（含縮圖與完整分析）。本機隨時可查；若已在「設定」設好 Google 後台，會一併同步到雲端「審題記錄」，並把<strong>原始考卷檔案</strong>（照片／PDF／Word）存進你 Google Drive 的「審題考卷檔案」資料夾，於下方以 📎 連結開啟，可跨裝置查看。</div>
         <div id="vHistory"></div>
       </details>
     </div>
@@ -1452,7 +1452,9 @@ function addVList(files){
       const r=new FileReader();
       r.onload=async ev=>{
         try{
-          const text=await extractPdfText(ev.target.result);
+          const b64=ev.target.result.split(',')[1];
+          setVFileBytes(id,b64,f.type||'application/pdf'); // 保留原始檔以便存雲端
+          const text=await extractPdfText(b64ToBuf(b64));
           if(!text||text.replace(/[-第頁\s]/g,'').length<10){
             finalizeVDocItem(id,null,'PDF 內無法擷取到文字（可能是掃描影像），請改用照片上傳');
           } else {
@@ -1463,13 +1465,15 @@ function addVList(files){
         }
       };
       r.onerror=()=>finalizeVDocItem(id,null,'PDF 檔案讀取失敗');
-      r.readAsArrayBuffer(f);
+      r.readAsDataURL(f);
     } else if(isDocx){
       const id=addVDocPlaceholder(f.name,'docx');
       const r=new FileReader();
       r.onload=async ev=>{
         try{
-          const text=await extractDocxText(ev.target.result);
+          const b64=ev.target.result.split(',')[1];
+          setVFileBytes(id,b64,f.type||'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+          const text=await extractDocxText(b64ToBuf(b64));
           if(!text||text.length<10){
             finalizeVDocItem(id,null,'Word 文件內無法擷取到文字內容');
           } else {
@@ -1480,7 +1484,7 @@ function addVList(files){
         }
       };
       r.onerror=()=>finalizeVDocItem(id,null,'Word 檔案讀取失敗');
-      r.readAsArrayBuffer(f);
+      r.readAsDataURL(f);
     } else if(isOldDoc){
       alert('不支援舊版 .doc 格式，請另存為 .docx 後再上傳');
     }
@@ -1489,9 +1493,14 @@ function addVList(files){
 }
 function addVFile(name,b64,dataUrl){
   const id='v'+Date.now()+Math.random().toString(36).slice(2);
-  vItems.push({type:'file',id,name,b64,dataUrl,status:'pending'});
+  const mime=(dataUrl.match(/^data:([^;]+)/)||[])[1]||'image/jpeg';
+  vItems.push({type:'file',id,name,b64,dataUrl,mime,status:'pending'});
   renderVGrid();
 }
+// base64 → ArrayBuffer（供 PDF/Word 解析器使用）
+function b64ToBuf(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
+// 於文件（PDF/Word）項目上保留原始檔位元組，供上傳雲端保存
+function setVFileBytes(id,b64,mime){const it=vItems.find(x=>x.id===id);if(it){it.fileB64=b64;it.mime=mime;}}
 function addVDocPlaceholder(name,kind){
   const id='v'+Date.now()+Math.random().toString(36).slice(2);
   vItems.push({type:'file',id,name,kind,text:'',status:'extracting'});
@@ -2034,11 +2043,19 @@ async function saveReview(group,r){
       catch(e){if(list.length<=1){try{delete review.thumb;DB.set('reviews',[review]);}catch{}break;}list=list.slice(0,Math.ceil(list.length*0.7));}
     }
     renderReviewHistory();
-    // 雲端同步（選配）：thumb 可能較大，序列化過大時去掉 thumb 再送
+    // 雲端同步（選配）：thumb 可能較大，序列化過大時去掉 thumb 再送；
+    // 並附上「原始考卷檔案」讓後台存進 Google Drive，回寫連結成為雲端歷史。
     if(DB.get('gasUrl','')){
       let payload=review;
       try{if(JSON.stringify(review).length>45000){payload={...review,thumb:null};}}catch{}
-      gasPost({action:'saveReview',review:payload}).then(()=>setSyncStatus('synced')).catch(()=>{});
+      const files=group.map(f=>({name:f.name,mime:f.mime||'application/octet-stream',b64:f.b64||f.fileB64})).filter(x=>x.b64);
+      gasPost({action:'saveReview',review:payload,files}).then(res=>{
+        setSyncStatus('synced');
+        if(res&&res.ok&&Array.isArray(res.files)&&res.files.length){
+          const cur=DB.get('reviews',[]);const t=cur.find(x=>x.id===review.id);
+          if(t){t.files=res.files;try{DB.set('reviews',cur);}catch{}renderReviewHistory();}
+        }
+      }).catch(()=>{});
     }
   }catch(err){/* 儲存失敗不影響審題結果顯示 */}
 }
@@ -2080,6 +2097,7 @@ function renderReviewHistory(){
           ${rv.pages&&rv.pages.length>1?`<span class="bdg by">📑 ${rv.pages.length}頁</span>`:''}
         </div>
         <div style="font-size:.7rem;color:var(--g400);margin-top:3px;">${ds}</div>
+        ${Array.isArray(rv.files)&&rv.files.length?`<div style="margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;">${rv.files.map(f=>`<a href="${esc(f.url)}" target="_blank" rel="noopener" style="font-size:.72rem;color:var(--pri);text-decoration:none;">📎 ${esc(f.name||'原始檔案')}</a>`).join('')}</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
         <button class="btn bo bsm" style="padding:4px 9px;" onclick="viewReview('${rv.id}')">檢視</button>
