@@ -20,8 +20,11 @@ const REVIEWS_SHEET = '審題記錄';
 // ★ 欄位定義 — 與 HTML review（審題歷史）物件對齊
 const REVIEW_COLS = [
   'id', 'reviewedAt', 'grade', 'subject', 'examTitle',
-  'summary', 'issueCount', 'pages', 'thumb', 'analysis'
+  'summary', 'issueCount', 'pages', 'thumb', 'analysis', 'files'
 ];
+
+// 原始考卷檔案存放的 Google Drive 資料夾名稱
+const REVIEW_FILES_FOLDER = '審題考卷檔案';
 
 // ★ 欄位定義 — 與 HTML submission 物件對齊
 const SUB_COLS = [
@@ -86,6 +89,7 @@ function doGet(e) {
     reviews.forEach(v => {
       try { v.pages = JSON.parse(v.pages || '[]'); } catch { v.pages = []; }
       try { v.analysis = JSON.parse(v.analysis || '{}'); } catch { v.analysis = {}; }
+      try { v.files = JSON.parse(v.files || '[]'); } catch { v.files = []; }
       v.issueCount = Number(v.issueCount) || 0;
     });
     return jsonResp({ ok: true, submissions, exams, reviews });
@@ -131,8 +135,23 @@ function doPost(e) {
     const rv = body.review;
     if (!rv?.id) return jsonResp({ ok: false, error: '缺少 review.id' });
     const { reviewSheet } = setupSheets();
+    // 若前端附上原始考卷檔案，存進 Google Drive 並回寫連結
+    let savedFiles = [];
+    try {
+      if (Array.isArray(body.files) && body.files.length) {
+        const folder = getReviewFolder();
+        body.files.forEach((f, i) => {
+          if (!f || !f.b64) return;
+          const name = f.name || ('考卷_' + rv.id + '_' + (i + 1));
+          const blob = Utilities.newBlob(Utilities.base64Decode(f.b64), f.mime || 'application/octet-stream', name);
+          const file = folder.createFile(blob);
+          savedFiles.push({ name: name, url: file.getUrl() });
+        });
+      }
+    } catch (err) { /* Drive 儲存失敗不影響審題記錄本身 */ }
+    if (savedFiles.length) rv.files = (rv.files || []).concat(savedFiles);
     upsertRow(reviewSheet, REVIEW_COLS, rv.id, reviewToRow(rv));
-    return jsonResp({ ok: true, message: '審題記錄已儲存' });
+    return jsonResp({ ok: true, message: '審題記錄已儲存', files: savedFiles });
   }
 
   if (action === 'syncAll') {
@@ -249,5 +268,12 @@ function reviewToRow(rv) {
     pages:      JSON.stringify(rv.pages || []),
     thumb:      thumb,
     analysis:   JSON.stringify(rv.analysis || {}),
+    files:      JSON.stringify(rv.files || []),
   };
+}
+
+// 取得（或建立）存放原始考卷檔案的 Google Drive 資料夾
+function getReviewFolder() {
+  const it = DriveApp.getFoldersByName(REVIEW_FILES_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(REVIEW_FILES_FOLDER);
 }
