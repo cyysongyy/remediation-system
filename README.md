@@ -89,8 +89,11 @@ README.md                  ← 本說明文件
 |---|---|---|---|
 | Google Gemini | `gemini-2.5-flash`（預設） | `AQ.…` 或 `AIzaSy…` | 免費（每日1440次） |
 | OpenAI | `gpt-4o-mini` | `sk-…` | 付費 |
+| NVIDIA NIM | `meta/llama-3.2-90b-vision-instruct`（預設） | `nvapi-…` | 免費額度（[build.nvidia.com](https://build.nvidia.com/)） |
 
-兩組 Key 可同時設定，在 **⚙️ 設定** 中選擇優先使用哪個引擎（Gemini / OpenAI / 自動）。
+三組 Key 可同時設定，在 **⚙️ 設定** 中選擇優先使用哪個引擎（Gemini / OpenAI / NVIDIA / 自動），未設定或呼叫失敗會自動備援到下一個。
+
+> NVIDIA 採 OpenAI 相容介面；因考卷多為照片，請選**視覺（Vision）模型**（如 Llama 3.2 Vision、Phi-3.5 Vision）才能讀取影像。純文字的 Word／PDF 則不受限。
 
 多頁考卷會將所有頁面**一次送入 AI**，讓 AI 綜合所有頁面後再評分，提升準確度。
 

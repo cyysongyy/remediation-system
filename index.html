@@ -198,8 +198,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
 .mc2{padding:3px 10px;border-radius:20px;font-size:.71rem;font-weight:600;cursor:pointer;
   border:1.5px solid var(--g200);color:var(--g600);transition:all .15s;}
 .mc2.active{border-color:var(--pri);background:var(--pril);color:var(--pri);}
-.ptog{display:flex;gap:6px;margin-top:8px;}
-.pto{flex:1;padding:7px;text-align:center;border-radius:8px;border:1.5px solid var(--g200);
+.ptog{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.pto{flex:1 1 44%;min-width:110px;padding:7px;text-align:center;border-radius:8px;border:1.5px solid var(--g200);
   font-size:.79rem;font-weight:600;cursor:pointer;transition:all .15s;color:var(--g600);}
 .pto.active{border-color:var(--pri);background:var(--pril);color:var(--pri);}
 .gas-block{border:1.5px solid var(--g200);border-radius:10px;padding:13px;margin-bottom:10px;}
@@ -255,6 +255,7 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
     <div class="sync-pill" id="syncPill" onclick="manualSync()">⭕ 未連線</div>
     <div class="api-badge api-off" id="hdGemini">Gemini</div>
     <div class="api-badge api-off" id="hdOpenai">GPT</div>
+    <div class="api-badge api-off" id="hdNvidia">NVIDIA</div>
   </div>
 </div>
 
@@ -515,11 +516,12 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
   <div class="sec" id="sec-settings">
     <div class="card">
       <div class="ct">⚙️ AI 多模態設定</div>
-      <div class="al ai" style="font-size:.79rem;">支援 Gemini 與 OpenAI，可同時設定，自動備援。</div>
+      <div class="al ai" style="font-size:.79rem;">支援 Gemini、OpenAI 與 NVIDIA，可同時設定，自動備援。</div>
       <div style="font-weight:700;font-size:.83rem;margin-bottom:7px;color:var(--g700);">優先使用</div>
       <div class="ptog">
         <div class="pto" id="ptG" onclick="setPri('gemini')">🟦 Gemini 優先</div>
         <div class="pto" id="ptO" onclick="setPri('openai')">🟩 OpenAI 優先</div>
+        <div class="pto" id="ptN" onclick="setPri('nvidia')">🟢 NVIDIA 優先</div>
         <div class="pto" id="ptA" onclick="setPri('auto')">🔄 自動</div>
       </div>
     </div>
@@ -561,6 +563,23 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:#eef2
         <div class="mc2" data-m="gpt-4o-mini" onclick="setM('openai','gpt-4o-mini')">GPT-4o mini ⚡</div>
         <div class="mc2" data-m="gpt-4o" onclick="setM('openai','gpt-4o')">GPT-4o 🎯</div>
       </div>
+    </div>
+
+    <div class="apib">
+      <div class="apib-hd">
+        <div style="font-weight:700;font-size:.88rem;">🟢 NVIDIA NIM <span class="dot" id="nDot"></span>
+          <span id="nTxt" style="font-size:.7rem;color:var(--g400);font-weight:400;margin-left:3px;"></span></div>
+        <button class="btn bo bsm" onclick="testApi('nvidia')">測試</button>
+      </div>
+      <div class="fg" style="margin-bottom:6px;"><label class="fl">API Key</label>
+        <div style="position:relative;"><input type="password" id="nvKey" class="fi" placeholder="nvapi-…" style="padding-right:40px;"/>
+          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;" onclick="tv('nvKey')">👁</span></div></div>
+      <div class="mchips" id="nModels">
+        <div class="mc2" data-m="meta/llama-3.2-90b-vision-instruct" onclick="setM('nvidia','meta/llama-3.2-90b-vision-instruct')">Llama 3.2 90B 👁</div>
+        <div class="mc2" data-m="meta/llama-3.2-11b-vision-instruct" onclick="setM('nvidia','meta/llama-3.2-11b-vision-instruct')">Llama 3.2 11B ⚡</div>
+        <div class="mc2" data-m="microsoft/phi-3.5-vision-instruct" onclick="setM('nvidia','microsoft/phi-3.5-vision-instruct')">Phi-3.5 Vision 🖼️</div>
+      </div>
+      <div style="font-size:.69rem;color:var(--g400);margin-top:5px;">免費額度：<a href="https://build.nvidia.com/" target="_blank" style="color:var(--pri);">build.nvidia.com</a>（選視覺 Vision 模型才能讀考卷照片）</div>
     </div>
 
     <div class="gas-block">
@@ -720,11 +739,13 @@ let rosterData=[];
 let camStream=null, camFacing='environment', camTarget='batch';
 let dashC={};
 
+const NV_ENDPOINT='https://integrate.api.nvidia.com/v1/chat/completions';
+const NV_DEFAULT_MODEL='meta/llama-3.2-90b-vision-instruct';
 const AI={
   providers(){
-    const gk=DB.get('gemKey',''),ok=DB.get('oaiKey',''),pri=DB.get('priAPI','auto');
+    const gk=DB.get('gemKey',''),ok=DB.get('oaiKey',''),nk=DB.get('nvKey',''),pri=DB.get('priAPI','auto');
     // ★ 修改4：預設模型改為 gemini-2.5-flash
-    const gm=DB.get('gModel','gemini-2.5-flash'),om=DB.get('oModel','gpt-4o-mini');
+    const gm=DB.get('gModel','gemini-2.5-flash'),om=DB.get('oModel','gpt-4o-mini'),nm=DB.get('nModel',NV_DEFAULT_MODEL);
     const gemini={id:'gemini',name:'Gemini',
       async call(p,img){
         const parts=[{text:p}];
@@ -753,16 +774,31 @@ const AI={
         }
         return d.choices?.[0]?.message?.content||'';
       }};
-    const arr=[];
-    if(pri==='gemini'){if(gk)arr.push(gemini);if(ok)arr.push(openai);}
-    else if(pri==='openai'){if(ok)arr.push(openai);if(gk)arr.push(gemini);}
-    else{if(gk)arr.push(gemini);if(ok)arr.push(openai);}
-    return arr;
+    // NVIDIA NIM：OpenAI 相容介面（不帶 response_format，以相容各家模型）
+    const nvidia={id:'nvidia',name:'NVIDIA',
+      async call(p,img){
+        const imgs=Array.isArray(img)?img:(img?[img]:[]);
+        const c=[{type:'text',text:p},...imgs.map(im=>({type:'image_url',image_url:{url:`data:image/jpeg;base64,${im}`}}))];
+        const r=await fetch(NV_ENDPOINT,
+          {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${nk}`},
+           body:JSON.stringify({model:nm,messages:[{role:'user',content:c}],max_tokens:8192,temperature:.1})});
+        const d=await r.json();if(!r.ok)throw new Error(d.error?.message||d.detail||`NVIDIA ${r.status}`);
+        if(d.choices?.[0]?.finish_reason==='length'&&!d.choices?.[0]?.message?.content){
+          throw new Error('NVIDIA 回應被截斷且無內容，請縮小圖片範圍或分區塊拍攝後再試');
+        }
+        return d.choices?.[0]?.message?.content||'';
+      }};
+    const map={gemini:gk&&gemini,openai:ok&&openai,nvidia:nk&&nvidia};
+    const order=pri==='gemini'?['gemini','openai','nvidia']
+      :pri==='openai'?['openai','gemini','nvidia']
+      :pri==='nvidia'?['nvidia','gemini','openai']
+      :['gemini','openai','nvidia'];
+    return order.map(k=>map[k]).filter(Boolean);
   },
   lastUsed:'',
   async call(p,img=null){
     const ps=this.providers();
-    if(!ps.length)throw new Error('請先在「設定」輸入 Gemini 或 OpenAI API Key');
+    if(!ps.length)throw new Error('請先在「設定」輸入 Gemini、OpenAI 或 NVIDIA API Key');
     let last;
     for(const pv of ps){try{const r=await pv.call(p,img);this.lastUsed=pv.name;return r;}catch(e){last=e;}}
     throw last;
@@ -1327,18 +1363,22 @@ ${roster}
     const raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
     return parseAIJson(raw);
   } else {
-    // OpenAI: send all pages in one message
-    const ok=DB.get('oaiKey','');
-    const om=DB.get('oModel','gpt-4o-mini');
+    // OpenAI 相容（OpenAI／NVIDIA）：一次送出所有頁面
+    const isNv=provider.id==='nvidia';
+    const key=DB.get(isNv?'nvKey':'oaiKey','');
+    const model=isNv?DB.get('nModel',NV_DEFAULT_MODEL):DB.get('oModel','gpt-4o-mini');
+    const endpoint=isNv?NV_ENDPOINT:'https://api.openai.com/v1/chat/completions';
     const content=[{type:'text',text:prompt}];
     pages.forEach((p,i)=>{
       content.push({type:'text',text:`\n[第${i+1}頁]`});
       content.push({type:'image_url',image_url:{url:`data:image/jpeg;base64,${p.b64}`}});
     });
-    const r=await fetch('https://api.openai.com/v1/chat/completions',
-      {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${ok}`},
-       body:JSON.stringify({model:om,messages:[{role:'user',content}],max_tokens:8192,response_format:{type:'json_object'}})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`OpenAI ${r.status}`);
+    const body={model,messages:[{role:'user',content}],max_tokens:8192};
+    if(!isNv)body.response_format={type:'json_object'};else body.temperature=.1;
+    const r=await fetch(endpoint,
+      {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+       body:JSON.stringify(body)});
+    const d=await r.json();if(!r.ok)throw new Error(d.error?.message||d.detail||`${provider.name} ${r.status}`);
     const raw=d.choices?.[0]?.message?.content||'';
     return parseAIJson(raw);
   }
@@ -1620,7 +1660,7 @@ function buildVGridWithInsertZones(){
 async function startValidate(){
   const groups=vGroups();
   if(!groups.length){alert('請先上傳空白考卷照片、Word 或 PDF');return;}
-  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini 或 OpenAI API Key');return;}
+  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini、OpenAI 或 NVIDIA API Key');return;}
   const stillExtracting=vItems.some(x=>x.type==='file'&&x.status==='extracting');
   if(stillExtracting){alert('還有文件正在擷取文字，請稍候再試一次');return;}
   const btn=document.getElementById('vStartBtn');
@@ -2365,7 +2405,7 @@ function classAggregates(examId){
 async function genClassReport(examId){
   const agg=classAggregates(examId);
   if(!agg){alert('尚無批改記錄');return;}
-  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini 或 OpenAI API Key');return;}
+  if(!AI.providers().length){alert('請先在「設定」輸入 Gemini、OpenAI 或 NVIDIA API Key');return;}
   const area=document.getElementById('clsAIReport');
   area.innerHTML='<div class="ld"><div class="sp"></div>AI 分析全班數據中…</div>';
   const {exam,n,avg,passRate,max,min,stats,mcTop,etTop}=agg;
@@ -2651,9 +2691,13 @@ async function testGAS(){
 }
 async function manualSync(){const url=DB.get('gasUrl','');if(!url){showTab('settings');return;}await pullFromGAS();}
 
+const PR_MODEL_KEY={gemini:'gModel',openai:'oModel',nvidia:'nModel'};
+const PR_MODEL_DEF={gemini:'gemini-2.5-flash',openai:'gpt-4o-mini',nvidia:NV_DEFAULT_MODEL};
+const PR_PREFIX={gemini:'g',openai:'o',nvidia:'n'};
 function loadSettings(){
   document.getElementById('gemKey').value=DB.get('gemKey','')||'';
   document.getElementById('oaiKey').value=DB.get('oaiKey','')||'';
+  document.getElementById('nvKey').value=DB.get('nvKey','')||'';
   // ★ 預設 GAS URL
   const gasUrl=DB.get('gasUrl','')||'https://script.google.com/macros/s/AKfycbyv8GxIx6iJzm6b6Bf0hN0hg8pPpZcCShIvGzOUoB8GFaL3zNlsPbXFLgQRyF_vpLQ_/exec';
   document.getElementById('gasUrl').value=gasUrl;
@@ -2661,29 +2705,33 @@ function loadSettings(){
   const pri=DB.get('priAPI','auto');
   document.getElementById('ptG').classList.toggle('active',pri==='gemini');
   document.getElementById('ptO').classList.toggle('active',pri==='openai');
+  document.getElementById('ptN').classList.toggle('active',pri==='nvidia');
   document.getElementById('ptA').classList.toggle('active',pri==='auto');
   // ★ 修改5：loadSettings 預設模型改為 gemini-2.5-flash
   setMUI('gemini',DB.get('gModel','gemini-2.5-flash'));
   setMUI('openai',DB.get('oModel','gpt-4o-mini'));
+  setMUI('nvidia',DB.get('nModel',NV_DEFAULT_MODEL));
   setSyncStatus(DB.get('gasUrl','')?'synced':'none');
 }
 function setPri(p){DB.set('priAPI',p);loadSettings();}
-function setM(pr,m){DB.set(pr==='gemini'?'gModel':'oModel',m);setMUI(pr,m);}
-function setMUI(pr,m){document.querySelectorAll(`#${pr==='gemini'?'g':'o'}Models .mc2`).forEach(c=>c.classList.toggle('active',c.dataset.m===m));}
+function setM(pr,m){DB.set(PR_MODEL_KEY[pr],m);setMUI(pr,m);}
+function setMUI(pr,m){document.querySelectorAll(`#${PR_PREFIX[pr]}Models .mc2`).forEach(c=>c.classList.toggle('active',c.dataset.m===m));}
 function saveSettings(){
   const gk=document.getElementById('gemKey').value.trim();
   const ok=document.getElementById('oaiKey').value.trim();
+  const nk=document.getElementById('nvKey').value.trim();
   const gu=document.getElementById('gasUrl').value.trim();
-  if(!gk&&!ok){showMsg('settingsMsg','請至少輸入一組 API Key','ae');return;}
-  if(gk)DB.set('gemKey',gk);if(ok)DB.set('oaiKey',ok);if(gu)DB.set('gasUrl',gu);
+  if(!gk&&!ok&&!nk){showMsg('settingsMsg','請至少輸入一組 API Key','ae');return;}
+  if(gk)DB.set('gemKey',gk);if(ok)DB.set('oaiKey',ok);if(nk)DB.set('nvKey',nk);if(gu)DB.set('gasUrl',gu);
   showMsg('settingsMsg','✅ 設定已儲存','as');updateHdBadges();
   if(gu)setSyncStatus('offline');
 }
 async function testApi(pr){
-  const key=(document.getElementById(pr==='gemini'?'gemKey':'oaiKey').value.trim())||DB.get(pr==='gemini'?'gemKey':'oaiKey','');
+  const keyId={gemini:'gemKey',openai:'oaiKey',nvidia:'nvKey'}[pr];
+  const key=(document.getElementById(keyId).value.trim())||DB.get(keyId,'');
   if(!key){alert('請輸入 API Key');return;}
-  const dot=document.getElementById(pr==='gemini'?'gDot':'oDot');
-  const txt=document.getElementById(pr==='gemini'?'gTxt':'oTxt');
+  const dot=document.getElementById(PR_PREFIX[pr]+'Dot');
+  const txt=document.getElementById(PR_PREFIX[pr]+'Txt');
   dot.className='dot';txt.textContent='測試中…';
   try{
     if(pr==='gemini'){
@@ -2693,10 +2741,12 @@ async function testApi(pr){
         {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'hi'}]}],generationConfig:{maxOutputTokens:5}})});
       const d=await r.json();if(!r.ok)throw new Error(d.error?.message);
     }else{
-      const m=DB.get('oModel','gpt-4o-mini');
-      const r=await fetch('https://api.openai.com/v1/chat/completions',
+      const isNv=pr==='nvidia';
+      const m=isNv?DB.get('nModel',NV_DEFAULT_MODEL):DB.get('oModel','gpt-4o-mini');
+      const endpoint=isNv?NV_ENDPOINT:'https://api.openai.com/v1/chat/completions';
+      const r=await fetch(endpoint,
         {method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:m,messages:[{role:'user',content:'hi'}],max_tokens:5})});
-      const d=await r.json();if(!r.ok)throw new Error(d.error?.message);
+      const d=await r.json();if(!r.ok)throw new Error(d.error?.message||d.detail);
     }
     dot.className='dot ok';txt.textContent='✅ 連線正常';
   }catch(e){dot.className='dot err';txt.textContent='❌ '+e.message.slice(0,35);}
@@ -2704,6 +2754,7 @@ async function testApi(pr){
 function updateHdBadges(){
   document.getElementById('hdGemini').className='api-badge '+(DB.get('gemKey','')?'api-on':'api-off');
   document.getElementById('hdOpenai').className='api-badge '+(DB.get('oaiKey','')?'api-on':'api-off');
+  document.getElementById('hdNvidia').className='api-badge '+(DB.get('nvKey','')?'api-on':'api-off');
 }
 
 function esc(s){if(typeof s!=='string')return '';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -2714,7 +2765,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   // ★ 預設 GAS URL（若尚未設定）
   const DEFAULT_GAS='https://script.google.com/macros/s/AKfycbyv8GxIx6iJzm6b6Bf0hN0hg8pPpZcCShIvGzOUoB8GFaL3zNlsPbXFLgQRyF_vpLQ_/exec';
   if(!DB.get('gasUrl',''))DB.set('gasUrl',DEFAULT_GAS);
-  loadSettings();renderDashboard();renderExamList2();renderReviewHistory();
+  loadSettings();renderDashboard();renderExamList2();renderReviewHistory();updateHdBadges();
   setSyncStatus('none');
   document.getElementById('bupZone').addEventListener('dragover',e=>{e.preventDefault();document.getElementById('bupZone').classList.add('drag');});
 });
