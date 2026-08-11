@@ -211,6 +211,14 @@ textarea.fi{resize:vertical;min-height:56px;}
         <label>後台網址</label>
         <input id="gasUrl" class="fi" placeholder="https://script.google.com/macros/s/…/exec" style="margin-bottom:0;">
       </div>
+      <div class="field">
+        <label>天氣地點</label>
+        <div class="row2">
+          <input id="weatherCity" class="fi" placeholder="台北" style="margin-bottom:0;">
+          <button class="btn ghost" onclick="saveWeatherCity()" style="flex:0 0 auto;">儲存地點</button>
+        </div>
+        <div class="hint">城市名稱即可（例如「台北」「高雄」），用於首頁天氣與每日簡報，預設台北。</div>
+      </div>
       <div class="hint">
         設定後可：待辦／提醒同步雲端、彙整 Gmail 未讀信與日曆行程、每日 7 點自動寄「Ybot 每日簡報」、提醒到點主動寄信。<br>
         部署步驟：開一份 Google 試算表 → 擴充功能 → Apps Script → 貼上 <code>ybot-backend.gs</code> → 執行一次 <code>setupDailyBrief()</code>、<code>setupReminderWatch()</code>、<code>setupEveningDigest()</code> 授權 → 部署為網頁應用程式（執行身分：我；存取：所有人）→ 複製網址貼在這裡。每日簡報會依🔴今天必須／🟠建議今天／🟢可延後分級；晚間彙整只在還有未處理的🔴🟠事項時才會寄信，平時不打擾。
@@ -251,7 +259,7 @@ const LS_KEY='ybot_v1';
 function defaults(){return{
   theme:'',
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
-  gasUrl:'',remUrl:'',hltUrl:'',
+  gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',
   links:[
     {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
     {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
@@ -289,9 +297,20 @@ function fillSettings(){
   document.getElementById('openaiKey').value=state.ai.openai;
   document.getElementById('nvidiaKey').value=state.ai.nvidia;
   document.getElementById('gasUrl').value=state.gasUrl;
+  document.getElementById('weatherCity').value=state.weatherCity;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
   renderLinks();
+}
+function saveWeatherCity(){
+  state.weatherCity=document.getElementById('weatherCity').value.trim();
+  save();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveWeatherLocation',city:state.weatherCity})})
+      .then(()=>refreshContext()).catch(()=>{});
+  }
+  alert('已儲存天氣地點');
 }
 function saveSettings(showToast){
   state.ai.provider=document.getElementById('aiProvider').value;
@@ -458,6 +477,11 @@ function renderOverview(){
   const c=state.context;
   if(!c){box.style.display='none';box.innerHTML='';return;}
 
+  const w=c.weather;
+  const weatherHtml=w
+    ? `<div class="ovItem">${esc(w.icon||'🌡️')} ${esc(w.city||'')}　${esc(w.desc||'')}　現在 ${w.temp}°C（今日 ${w.tMin}~${w.tMax}°C，降雨機率 ${w.rainChance??'—'}%）</div>`
+    : `<div class="ovItem ovEmpty">暫無天氣資料</div>`;
+
   const todayStr=new Date().toDateString();
   const todayEvents=(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr);
   const scheduleHtml=todayEvents.length
@@ -485,6 +509,7 @@ function renderOverview(){
 
   box.innerHTML=
     `<div class="section-title">☀️ 今日總覽</div>`+
+    `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📅 今日行程</div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📰 今日新聞</div>${newsHtml}</div>`;
@@ -547,6 +572,7 @@ function buildContextText(){
   if(knownLinks.length)lines.push('使用者自建的其他 App：'+knownLinks.map(l=>`${l.name}(${l.url})`).join('；'));
   const c=state.context;
   if(c){
+    if(c.weather)lines.push(`今日天氣：${c.weather.city} ${c.weather.desc}，現在${c.weather.temp}°C，今日${c.weather.tMin}~${c.weather.tMax}°C，降雨機率${c.weather.rainChance??'—'}%`);
     if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
     if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.slice(0,8).map(m=>`${m.subject}(來自${m.from})`).join('；'));
     if(c.news){

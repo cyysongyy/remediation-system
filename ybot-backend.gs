@@ -153,10 +153,15 @@ function doPost(e) {
     setAiConfig(body.provider, body.key);
     return jsonResp({ ok: true, message: '已儲存 AI 設定' });
   }
+  if (action === 'saveWeatherLocation') {
+    writeKv({ weatherCity: body.city || '' });
+    CacheService.getScriptCache().remove('weatherDigest'); // 換地點後清掉舊快取，下次立刻抓新地點
+    return jsonResp({ ok: true, message: '已儲存天氣地點' });
+  }
   return jsonResp({ ok: false, error: 'Unknown action: ' + action });
 }
 
-// ── 彙整上下文：Gmail + 日曆 + 新聞 + 待辦提醒 + 其他系統摘要 ──
+// ── 彙整上下文：Gmail + 日曆 + 新聞 + 天氣 + 待辦提醒 + 其他系統摘要 ──
 function buildContext() {
   return {
     generatedAt: new Date().toISOString(),
@@ -164,6 +169,7 @@ function buildContext() {
     gmail: getGmailDigest(),
     calendar: getCalendarDigest(),
     news: getNewsDigest(),
+    weather: getWeatherDigest(),
     linked: getLinkedSummaries()
   };
 }
@@ -227,6 +233,77 @@ function fetchNewsRss(url, limit) {
       link: it.getChildText('link') || ''
     }));
   } catch (err) { return []; }
+}
+
+// 天氣彙整：來源 Open-Meteo（免金鑰）。地點預設「台北」，可在設定 → 雲端後台改地點名稱
+// （後台會用地名查經緯度）。快取 30 分鐘；地名轉經緯度另外快取 24 小時，很少變動不用常查。
+function getWeatherDigest() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('weatherDigest');
+  if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
+
+  const cityLabel = readKv().weatherCity || '台北';
+  const coords = geocodeCity(cityLabel);
+  if (!coords) return null;
+
+  let out = null;
+  try {
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + coords.lat + '&longitude=' + coords.lon +
+      '&current=temperature_2m,weather_code,relative_humidity_2m,precipitation_probability' +
+      '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+      '&timezone=Asia%2FTaipei&forecast_days=1';
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      const d = JSON.parse(res.getContentText());
+      const cur = d.current || {};
+      const daily = d.daily || {};
+      const info = weatherCodeInfo(cur.weather_code);
+      out = {
+        city: coords.name || cityLabel,
+        icon: info[0], desc: info[1],
+        temp: cur.temperature_2m,
+        humidity: cur.relative_humidity_2m,
+        tMax: (daily.temperature_2m_max || [])[0] ?? null,
+        tMin: (daily.temperature_2m_min || [])[0] ?? null,
+        rainChance: (daily.precipitation_probability_max || [])[0] ?? cur.precipitation_probability ?? null
+      };
+    }
+  } catch (err) { out = null; }
+
+  if (out) { try { cache.put('weatherDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過容量就不快取 */ } }
+  return out;
+}
+function geocodeCity(name) {
+  const cache = CacheService.getScriptCache();
+  const key = 'geo_' + name;
+  const cached = cache.get(key);
+  if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重查 */ } }
+  try {
+    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(name);
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return null;
+    const d = JSON.parse(res.getContentText());
+    const r = d.results && d.results[0];
+    if (!r) return null;
+    const out = { lat: r.latitude, lon: r.longitude, name: r.name };
+    try { cache.put(key, JSON.stringify(out), 86400); } catch (err) { /* 超過容量就不快取，下次仍會重查 */ }
+    return out;
+  } catch (err) { return null; }
+}
+function weatherCodeInfo(code) {
+  const map = {
+    0: ['☀️', '晴朗'], 1: ['🌤️', '大致晴朗'], 2: ['⛅', '局部多雲'], 3: ['☁️', '陰天'],
+    45: ['🌫️', '有霧'], 48: ['🌫️', '霧淞'],
+    51: ['🌦️', '毛毛雨'], 53: ['🌦️', '毛毛雨'], 55: ['🌦️', '毛毛雨'],
+    56: ['🌧️', '凍雨'], 57: ['🌧️', '凍雨'],
+    61: ['🌧️', '小雨'], 63: ['🌧️', '中雨'], 65: ['🌧️', '大雨'],
+    66: ['🌧️', '凍雨'], 67: ['🌧️', '凍雨'],
+    71: ['🌨️', '小雪'], 73: ['🌨️', '中雪'], 75: ['🌨️', '大雪'], 77: ['🌨️', '雪粒'],
+    80: ['🌦️', '短暫陣雨'], 81: ['🌦️', '短暫陣雨'], 82: ['⛈️', '強陣雨'],
+    85: ['🌨️', '短暫陣雪'], 86: ['🌨️', '短暫陣雪'],
+    95: ['⛈️', '雷雨'], 96: ['⛈️', '雷雨挾冰雹'], 99: ['⛈️', '強雷雨挾冰雹']
+  };
+  return map[code] || ['🌡️', '天氣'];
 }
 
 // 串接考卷批改／健康預測兩套系統的後台（若已在設定中填入網址）
@@ -301,6 +378,11 @@ function dailyBrief() {
 
   let lines = [`【Ybot 每日簡報】${new Date().toLocaleDateString('zh-TW')}`, ''];
 
+  if (ctx.weather) {
+    const w = ctx.weather;
+    lines.push(`${w.icon} ${w.city}天氣：${w.desc}，現在 ${w.temp}°C（今日 ${w.tMin}~${w.tMax}°C，降雨機率 ${w.rainChance ?? '—'}%）`);
+    lines.push('');
+  }
   if (ctx.calendar.length) {
     lines.push('📅 未來行程：');
     ctx.calendar.slice(0, 8).forEach(ev => {
