@@ -243,7 +243,7 @@ function getWeatherDigest() {
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
 
   const cityLabel = readKv().weatherCity || '台北';
-  const coords = geocodeCity(cityLabel);
+  const coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
   if (!coords) return null;
 
   let out = null;
@@ -273,13 +273,28 @@ function getWeatherDigest() {
   if (out) { try { cache.put('weatherDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過容量就不快取 */ } }
   return out;
 }
+// Open-Meteo 地理編碼對中文城市名常常查不到（索引主要是英文/拼音），
+// 常見台灣城市先轉英文名再查，大幅提高命中率；查不到再用下面的固定座標當保底。
+const CITY_EN = {
+  '台北': 'Taipei', '臺北': 'Taipei', '新北': 'New Taipei', '桃園': 'Taoyuan',
+  '台中': 'Taichung', '臺中': 'Taichung', '台南': 'Tainan', '臺南': 'Tainan',
+  '高雄': 'Kaohsiung', '基隆': 'Keelung', '新竹': 'Hsinchu', '嘉義': 'Chiayi',
+  '宜蘭': 'Yilan', '花蓮': 'Hualien', '台東': 'Taitung', '臺東': 'Taitung',
+  '南投': 'Nantou', '雲林': 'Yunlin', '彰化': 'Changhua', '苗栗': 'Miaoli',
+  '屏東': 'Pingtung', '澎湖': 'Penghu', '金門': 'Kinmen'
+};
+const DEFAULT_WEATHER_COORDS = {
+  '台北': { lat: 25.033, lon: 121.5654, name: '台北' },
+  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' }
+};
 function geocodeCity(name) {
   const cache = CacheService.getScriptCache();
   const key = 'geo_' + name;
   const cached = cache.get(key);
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重查 */ } }
+  const query = CITY_EN[name] || name;
   try {
-    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(name);
+    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(query);
     const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) return null;
     const d = JSON.parse(res.getContentText());
