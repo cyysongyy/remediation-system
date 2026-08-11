@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ybot · 個人助理</title>
+<style>
+:root{
+  --pri:#6d28d9;--pri2:#4c1d95;
+  --tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;
+  --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;
+  --ok:#059669;--warn:#d97706;--bad:#dc2626;
+}
+@media(prefers-color-scheme:dark){
+  :root{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;}
+}
+:root[data-theme="dark"]{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;}
+:root[data-theme="light"]{--tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;--bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+a{color:var(--pri);}
+.wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 0 16px;}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand .logo{font-size:1.8rem;}
+.brand h1{font-size:1.2rem;font-weight:800;}
+.brand .sub{font-size:.72rem;color:var(--tx3);}
+.theme-btn{background:var(--card);border:1px solid var(--line);color:var(--tx);width:38px;height:38px;
+  border-radius:50%;cursor:pointer;font-size:1.05rem;display:flex;align-items:center;justify-content:center;}
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;margin-bottom:16px;}
+.tab{flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:.86rem;font-weight:700;color:var(--tx2);cursor:pointer;user-select:none;}
+.tab.active{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;}
+.pane{display:none;}
+.pane.active{display:block;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
+
+/* Chat */
+#chatBox{display:flex;flex-direction:column;gap:10px;min-height:280px;max-height:56vh;overflow-y:auto;padding:4px 2px;}
+.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.88rem;line-height:1.6;white-space:pre-wrap;}
+.msg.bot{align-self:flex-start;background:var(--bub);color:var(--tx);border-bottom-left-radius:4px;}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-bottom-right-radius:4px;}
+.msg.sys{align-self:center;color:var(--tx3);font-size:.74rem;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;}
+.chip{font-size:.76rem;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--tx2);cursor:pointer;}
+.chip:hover{border-color:var(--pri);color:var(--pri);}
+.inputRow{display:flex;gap:8px;margin-top:10px;}
+#chatInput{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.9rem;
+  background:var(--bg);color:var(--tx);font-family:inherit;min-height:44px;max-height:120px;}
+.sendBtn{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border:none;border-radius:12px;
+  padding:0 18px;font-weight:800;cursor:pointer;font-size:.9rem;}
+.sendBtn:disabled{opacity:.5;cursor:default;}
+.ctxbar{display:flex;align-items:center;justify-content:space-between;font-size:.72rem;color:var(--tx3);margin-bottom:8px;}
+.ctxbar button{background:none;border:none;color:var(--pri);font-weight:700;cursor:pointer;font-size:.72rem;}
+
+/* Notes */
+.typeSel{display:flex;gap:6px;margin-bottom:10px;}
+.typeSel label{flex:1;text-align:center;padding:8px 4px;border:1px solid var(--line);border-radius:10px;font-size:.8rem;cursor:pointer;color:var(--tx2);}
+.typeSel input{display:none;}
+.typeSel input:checked + span{font-weight:800;}
+.typeSel label:has(input:checked){border-color:var(--pri);color:var(--pri);background:rgba(109,40,217,.08);}
+.fi{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:.88rem;
+  background:var(--bg);color:var(--tx);font-family:inherit;margin-bottom:8px;}
+textarea.fi{resize:vertical;min-height:56px;}
+.btn{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border:none;border-radius:10px;
+  padding:9px 16px;font-weight:700;cursor:pointer;font-size:.85rem;}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--tx2);}
+.filterRow{display:flex;gap:6px;margin:4px 0 12px;}
+.filterRow .chip.active{background:var(--pri);color:#fff;border-color:var(--pri);}
+.noteItem{display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);}
+.noteItem:last-child{border-bottom:none;}
+.noteItem input[type=checkbox]{margin-top:3px;width:17px;height:17px;accent-color:var(--pri);flex-shrink:0;}
+.noteBody{flex:1;}
+.noteContent{font-size:.88rem;line-height:1.5;}
+.noteContent.done{text-decoration:line-through;color:var(--tx3);}
+.noteMeta{font-size:.72rem;color:var(--tx3);margin-top:3px;}
+.noteMeta.overdue{color:var(--bad);font-weight:700;}
+.typeTag{font-size:.66rem;padding:2px 8px;border-radius:8px;font-weight:700;margin-right:6px;}
+.typeTag.note{background:rgba(148,163,184,.18);color:var(--tx2);}
+.typeTag.todo{background:rgba(13,148,136,.14);color:#0d9488;}
+.typeTag.reminder{background:rgba(217,119,6,.14);color:var(--warn);}
+.delBtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:2px 6px;}
+.delBtn:hover{color:var(--bad);}
+.empty{text-align:center;color:var(--tx3);font-size:.84rem;padding:28px 0;}
+
+/* Settings */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:.8rem;font-weight:700;color:var(--tx2);margin-bottom:5px;}
+.hint{font-size:.7rem;color:var(--tx3);margin-top:4px;line-height:1.5;}
+.section-title{font-size:.86rem;font-weight:800;margin:4px 0 12px;color:var(--pri);}
+.row2{display:flex;gap:8px;}
+.row2 .fi{flex:1;}
+.statusLine{font-size:.76rem;margin-top:8px;padding:8px 10px;border-radius:8px;}
+.statusLine.ok{background:rgba(5,150,105,.1);color:var(--ok);}
+.statusLine.bad{background:rgba(220,38,38,.1);color:var(--bad);}
+</style>
+</head>
+<body>
+<button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.1);" onclick="toggleTheme()">🌓</button>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">🤖</div>
+      <div>
+        <h1>Ybot</h1>
+        <div class="sub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="chat" onclick="switchTab('chat')">💬 對話</div>
+    <div class="tab" data-tab="notes" onclick="switchTab('notes')">📝 待辦與筆記</div>
+    <div class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ 設定</div>
+  </div>
+
+  <!-- 💬 對話 -->
+  <div class="pane active" id="pane-chat">
+    <div class="card">
+      <div class="ctxbar">
+        <span id="ctxStatus">尚未載入雲端資料</span>
+        <button onclick="refreshContext()">🔄 重新整理資料</button>
+      </div>
+      <div id="chatBox"></div>
+      <div class="chips" id="chatChips">
+        <span class="chip" onclick="quickAsk('今天有什麼行程？')">今天有什麼行程？</span>
+        <span class="chip" onclick="quickAsk('我還有哪些待辦沒完成？')">還有哪些待辦？</span>
+        <span class="chip" onclick="quickAsk('幫我摘要一下未讀的重要信件')">摘要未讀信件</span>
+        <span class="chip" onclick="quickAsk('幫我整理今天最該優先做的事')">今天該優先做什麼？</span>
+      </div>
+      <div class="inputRow">
+        <textarea id="chatInput" class="fi" placeholder="問 Ybot 任何事…（Enter 送出，Shift+Enter 換行）" style="margin-bottom:0;"></textarea>
+        <button class="sendBtn" id="sendBtn" onclick="sendChat()">送出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📝 待辦與筆記 -->
+  <div class="pane" id="pane-notes">
+    <div class="card">
+      <div class="section-title">新增</div>
+      <div class="typeSel">
+        <label><input type="radio" name="ntype" value="note" checked><span>📌 瑣事筆記</span></label>
+        <label><input type="radio" name="ntype" value="todo"><span>✅ 待辦</span></label>
+        <label><input type="radio" name="ntype" value="reminder"><span>⏰ 定時提醒</span></label>
+      </div>
+      <textarea id="noteContent" class="fi" placeholder="寫下內容…"></textarea>
+      <div class="field" id="dueField" style="display:none;">
+        <label>提醒時間</label>
+        <input type="datetime-local" id="noteDue" class="fi" style="margin-bottom:0;">
+      </div>
+      <button class="btn" onclick="addNote()">新增</button>
+    </div>
+
+    <div class="card">
+      <div class="filterRow">
+        <span class="chip active" data-f="all" onclick="setFilter('all')">全部</span>
+        <span class="chip" data-f="note" onclick="setFilter('note')">📌 瑣事</span>
+        <span class="chip" data-f="todo" onclick="setFilter('todo')">✅ 待辦</span>
+        <span class="chip" data-f="reminder" onclick="setFilter('reminder')">⏰ 提醒</span>
+      </div>
+      <div id="noteList"></div>
+    </div>
+  </div>
+
+  <!-- ⚙️ 設定 -->
+  <div class="pane" id="pane-settings">
+    <div class="card">
+      <div class="section-title">🤖 AI 引擎（用於對話回覆與簡報摘要）</div>
+      <div class="field">
+        <label>優先順序</label>
+        <select id="aiProvider" class="fi" style="margin-bottom:0;">
+          <option value="auto">自動（Gemini → OpenAI → NVIDIA）</option>
+          <option value="gemini">優先 Gemini</option>
+          <option value="openai">優先 OpenAI</option>
+          <option value="nvidia">優先 NVIDIA</option>
+        </select>
+      </div>
+      <div class="field"><label>Gemini API Key</label><input id="geminiKey" class="fi" type="password" placeholder="AIzaSy… 或 AQ.…"></div>
+      <div class="field"><label>OpenAI API Key</label><input id="openaiKey" class="fi" type="password" placeholder="sk-…"></div>
+      <div class="field"><label>NVIDIA NIM API Key</label><input id="nvidiaKey" class="fi" type="password" placeholder="nvapi-…"></div>
+      <div class="hint">Key 僅存於你自己的瀏覽器，直接呼叫各家 API，不經第三方伺服器。免費取得：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a></div>
+      <button class="btn" onclick="saveSettings(true)">儲存</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">☁️ 雲端後台（Ybot Apps Script）</div>
+      <div class="field">
+        <label>後台網址</label>
+        <input id="gasUrl" class="fi" placeholder="https://script.google.com/macros/s/…/exec" style="margin-bottom:0;">
+      </div>
+      <div class="hint">
+        設定後可：待辦／提醒同步雲端、彙整 Gmail 未讀信與日曆行程、每日 7 點自動寄「Ybot 每日簡報」、提醒到點主動寄信。<br>
+        部署步驟：開一份 Google 試算表 → 擴充功能 → Apps Script → 貼上 <code>ybot-backend.gs</code> → 執行一次 <code>setupDailyBrief()</code> 與 <code>setupReminderWatch()</code> 授權 → 部署為網頁應用程式（執行身分：我；存取：所有人）→ 複製網址貼在這裡。
+      </div>
+      <div class="row2" style="margin-top:8px;">
+        <button class="btn" onclick="saveSettings(false);testConnection()">🔌 測試連線</button>
+        <button class="btn ghost" onclick="syncNotesToCloud()">⬆️ 同步待辦至雲端</button>
+      </div>
+      <div id="connStatus"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🔗 整合其他系統</div>
+      <div class="hint" style="margin-bottom:10px;">填入其他兩套系統的 Apps Script 後台網址，Ybot 對話與每日簡報就能一併帶入考卷批改與健康預測的最新摘要。</div>
+      <div class="field"><label>🎯 Remedial System 後台網址</label><input id="remUrl" class="fi" placeholder="remediation-backend.gs 部署網址" style="margin-bottom:0;"></div>
+      <div class="field" style="margin-top:10px;"><label>🫀 LifeSpan 健康 後台網址</label><input id="hltUrl" class="fi" placeholder="health-backend.gs 部署網址" style="margin-bottom:0;"></div>
+      <button class="btn" onclick="saveLinked()">儲存整合設定</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🗑️ 資料管理</div>
+      <button class="btn ghost" onclick="clearLocal()">清除本機資料（對話紀錄與筆記）</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 狀態管理 ─────────────────────────────
+const LS_KEY='ybot_v1';
+function defaults(){return{
+  theme:'',
+  ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
+  gasUrl:'',remUrl:'',hltUrl:'',
+  notes:[],chat:[],
+  context:null,contextAt:null
+};}
+let state;
+function load(){try{state=Object.assign(defaults(),JSON.parse(localStorage.getItem(LS_KEY))||{});}catch(e){state=defaults();}}
+function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
+load();
+
+// ── 主題 ────────────────────────────────
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);}
+function toggleTheme(){
+  const sysDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const now=state.theme||(sysDark?'dark':'light');
+  state.theme=now==='dark'?'light':'dark';applyTheme(state.theme);save();
+}
+if(state.theme)applyTheme(state.theme);
+
+// ── Tabs ────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
+  if(name==='notes')renderNotes();
+  if(name==='settings')fillSettings();
+}
+
+// ── 設定 ────────────────────────────────
+function fillSettings(){
+  document.getElementById('aiProvider').value=state.ai.provider;
+  document.getElementById('geminiKey').value=state.ai.gemini;
+  document.getElementById('openaiKey').value=state.ai.openai;
+  document.getElementById('nvidiaKey').value=state.ai.nvidia;
+  document.getElementById('gasUrl').value=state.gasUrl;
+  document.getElementById('remUrl').value=state.remUrl;
+  document.getElementById('hltUrl').value=state.hltUrl;
+}
+function saveSettings(showToast){
+  state.ai.provider=document.getElementById('aiProvider').value;
+  state.ai.gemini=document.getElementById('geminiKey').value.trim();
+  state.ai.openai=document.getElementById('openaiKey').value.trim();
+  state.ai.nvidia=document.getElementById('nvidiaKey').value.trim();
+  state.gasUrl=document.getElementById('gasUrl').value.trim();
+  save();
+  if(showToast){const el=document.getElementById('connStatus');el.className='statusLine ok';el.textContent='✅ 已儲存';el.style.display='block';setTimeout(()=>el.style.display='none',1800);}
+}
+function saveLinked(){
+  state.remUrl=document.getElementById('remUrl').value.trim();
+  state.hltUrl=document.getElementById('hltUrl').value.trim();
+  save();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveLinkedBackends',remediationBackendUrl:state.remUrl,healthBackendUrl:state.hltUrl})}).catch(()=>{});
+  }
+  alert('已儲存整合設定');
+}
+async function testConnection(){
+  const el=document.getElementById('connStatus');
+  if(!state.gasUrl){el.className='statusLine bad';el.textContent='請先輸入後台網址';el.style.display='block';return;}
+  el.className='statusLine';el.textContent='連線中…';el.style.display='block';
+  try{
+    const r=await fetch(state.gasUrl+'?action=ping');
+    const d=await r.json();
+    if(d.ok){el.className='statusLine ok';el.textContent='✅ 連線成功：'+d.message;}
+    else{el.className='statusLine bad';el.textContent='❌ '+(d.error||'連線失敗');}
+  }catch(e){el.className='statusLine bad';el.textContent='❌ 連線失敗，請確認網址與部署設定';}
+}
+function clearLocal(){
+  if(!confirm('確定清除本機的對話紀錄與筆記？（雲端資料不受影響）'))return;
+  state.chat=[];state.notes=[];save();renderChat();renderNotes();
+}
+
+// ── 待辦與筆記 ──────────────────────────
+document.querySelectorAll('input[name=ntype]').forEach(r=>r.addEventListener('change',()=>{
+  document.getElementById('dueField').style.display=r.value==='reminder'&&r.checked?'block':'none';
+}));
+let noteFilter='all';
+function setFilter(f){
+  noteFilter=f;
+  document.querySelectorAll('.filterRow .chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
+  renderNotes();
+}
+function addNote(){
+  const type=document.querySelector('input[name=ntype]:checked').value;
+  const content=document.getElementById('noteContent').value.trim();
+  if(!content){alert('請輸入內容');return;}
+  const dueAt=type==='reminder'?document.getElementById('noteDue').value:'';
+  if(type==='reminder'&&!dueAt){alert('請設定提醒時間');return;}
+  const n={id:'n'+Date.now()+Math.random().toString(36).slice(2,7),type,content,dueAt:dueAt?new Date(dueAt).toISOString():'',done:false,createdAt:new Date().toISOString(),notifiedAt:''};
+  state.notes.unshift(n);save();
+  document.getElementById('noteContent').value='';
+  document.getElementById('noteDue').value='';
+  renderNotes();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
+  }
+}
+function toggleNote(id){
+  const n=state.notes.find(x=>x.id===id);if(!n)return;
+  n.done=!n.done;save();renderNotes();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'updateNote',id,patch:{done:n.done?'true':''}})}).catch(()=>{});
+  }
+}
+function deleteNote(id){
+  state.notes=state.notes.filter(x=>x.id!==id);save();renderNotes();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteNote',id})}).catch(()=>{});
+  }
+}
+function syncNotesToCloud(){
+  if(!state.gasUrl){alert('請先設定並儲存雲端後台網址');return;}
+  fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'syncAll',notes:state.notes})})
+    .then(r=>r.json()).then(d=>alert(d.ok?'✅ '+d.message:'❌ '+d.error)).catch(()=>alert('❌ 同步失敗'));
+}
+const TYPE_LABEL={note:'📌 瑣事',todo:'✅ 待辦',reminder:'⏰ 提醒'};
+function renderNotes(){
+  const list=document.getElementById('noteList');
+  let items=state.notes.filter(n=>noteFilter==='all'||n.type===noteFilter);
+  items=items.slice().sort((a,b)=>{
+    if(!!a.done!==!!b.done)return a.done?1:-1;
+    return new Date(b.createdAt)-new Date(a.createdAt);
+  });
+  if(!items.length){list.innerHTML='<div class="empty">還沒有紀錄，新增一筆看看 👆</div>';return;}
+  const now=new Date();
+  list.innerHTML=items.map(n=>{
+    const overdue=n.dueAt&&!n.done&&new Date(n.dueAt)<now;
+    const dueTxt=n.dueAt?new Date(n.dueAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    const checkable=n.type!=='note';
+    return `<div class="noteItem">
+      ${checkable?`<input type="checkbox" ${n.done?'checked':''} onchange="toggleNote('${n.id}')">`:'<span style="width:17px;flex-shrink:0;text-align:center;">・</span>'}
+      <div class="noteBody">
+        <div class="noteContent ${n.done?'done':''}"><span class="typeTag ${n.type}">${TYPE_LABEL[n.type]}</span>${esc(n.content)}</div>
+        ${dueTxt?`<div class="noteMeta ${overdue?'overdue':''}">${overdue?'🔴 已逾期 · ':'⏰ '}${dueTxt}</div>`:''}
+      </div>
+      <button class="delBtn" onclick="deleteNote('${n.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ── 雲端上下文（Gmail／日曆／其他系統）────
+async function refreshContext(){
+  if(!state.gasUrl){document.getElementById('ctxStatus').textContent='尚未設定雲端後台（設定 → 雲端後台）';return;}
+  document.getElementById('ctxStatus').textContent='更新中…';
+  try{
+    const r=await fetch(state.gasUrl+'?action=context');
+    const d=await r.json();
+    if(d.ok){
+      state.context=d.context;state.contextAt=new Date().toISOString();save();
+      // 用雲端筆記合併本機（雲端為主，保留本機尚未同步的新項目）
+      const cloudIds=new Set((d.context.notes||[]).map(n=>n.id));
+      const localOnly=state.notes.filter(n=>!cloudIds.has(n.id));
+      const cloudNotes=(d.context.notes||[]).map(n=>({...n,done:n.done==='true'}));
+      state.notes=[...cloudNotes,...localOnly];save();
+      renderNotes();
+      showCtxStatus();
+    }else{document.getElementById('ctxStatus').textContent='❌ '+(d.error||'讀取失敗');}
+  }catch(e){document.getElementById('ctxStatus').textContent='❌ 讀取失敗，請確認後台網址';}
+}
+function showCtxStatus(){
+  const t=state.contextAt?new Date(state.contextAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):'';
+  const c=state.context;
+  document.getElementById('ctxStatus').textContent=c?`📡 資料更新於 ${t} · 📅${(c.calendar||[]).length}行程 · 📬${(c.gmail||[]).length}未讀信`:'尚未載入雲端資料';
+}
+
+// ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
+const NV_ENDPOINT='https://integrate.api.nvidia.com/v1/chat/completions';
+const NV_DEFAULT_MODEL='meta/llama-3.1-70b-instruct';
+function aiOrder(){
+  const p=state.ai.provider;
+  const all=['gemini','openai','nvidia'].filter(id=>state.ai[id]);
+  if(p==='auto'||!p)return all;
+  return [p,...all.filter(x=>x!==p)].filter(id=>state.ai[id]);
+}
+async function callAI(prompt){
+  const order=aiOrder();
+  if(!order.length)throw new Error('請先在「設定」填入至少一組 AI API Key');
+  let lastErr;
+  for(const id of order){
+    try{return await callProvider(id,prompt);}catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('AI 呼叫失敗');
+}
+async function callProvider(id,prompt){
+  if(id==='gemini'){
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.6,maxOutputTokens:1024}})});
+    const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
+    return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  }
+  const isNv=id==='nvidia';
+  const key=isNv?state.ai.nvidia:state.ai.openai;
+  const model=isNv?NV_DEFAULT_MODEL:'gpt-4o-mini';
+  const endpoint=isNv?NV_ENDPOINT:'https://api.openai.com/v1/chat/completions';
+  const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+    body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature:.6,max_tokens:1024})});
+  const d=await r.json();if(!r.ok)throw new Error(d.error?.message||d.detail||`${id} ${r.status}`);
+  return d.choices?.[0]?.message?.content||'';
+}
+
+// ── 對話 ────────────────────────────────
+function renderChat(){
+  const box=document.getElementById('chatBox');
+  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot！可以問我行程、待辦、信件摘要，或任何生活上的小事。</div>';return;}
+  box.innerHTML=state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join('');
+  box.scrollTop=box.scrollHeight;
+}
+function quickAsk(text){document.getElementById('chatInput').value=text;sendChat();}
+function buildContextText(){
+  const lines=[];
+  const pendingTodos=state.notes.filter(n=>n.type==='todo'&&!n.done);
+  const pendingReminders=state.notes.filter(n=>n.type==='reminder'&&!n.done);
+  const notesOnly=state.notes.filter(n=>n.type==='note');
+  if(pendingTodos.length)lines.push('未完成待辦：'+pendingTodos.map(n=>n.content).join('；'));
+  if(pendingReminders.length)lines.push('提醒事項：'+pendingReminders.map(n=>`${n.content}（${n.dueAt?new Date(n.dueAt).toLocaleString('zh-TW'):''}）`).join('；'));
+  if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,15).map(n=>n.content).join('；'));
+  const c=state.context;
+  if(c){
+    if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
+    if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.slice(0,8).map(m=>`${m.subject}(來自${m.from})`).join('；'));
+    if(c.linked?.remediation)lines.push('考卷批改系統摘要：'+JSON.stringify(c.linked.remediation));
+    if(c.linked?.health)lines.push('健康預測系統摘要：'+JSON.stringify(c.linked.health));
+  }
+  return lines.join('\n')||'（目前沒有額外資料，如需行程/信件請先在「設定」連接雲端後台）';
+}
+async function sendChat(){
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text)return;
+  state.chat.push({role:'user',text});
+  input.value='';renderChat();save();
+  const sendBtn=document.getElementById('sendBtn');sendBtn.disabled=true;sendBtn.textContent='思考中…';
+  const history=state.chat.slice(-8).map(m=>`${m.role==='user'?'使用者':'Ybot'}：${m.text}`).join('\n');
+  const prompt=`你是 Young 的個人助理 Ybot，個性溫暖、直接、有條理。請用繁體中文回答，簡潔但完整，需要條列時再條列。\n\n以下是你目前掌握的個人資料（僅供你參考回答，不必逐項複誦）：\n${buildContextText()}\n\n對話紀錄：\n${history}\n\n請針對使用者最新的訊息回覆。`;
+  try{
+    const reply=await callAI(prompt);
+    state.chat.push({role:'bot',text:reply||'（沒有取得回覆，請確認 AI 設定）'});
+  }catch(e){
+    state.chat.push({role:'bot',text:'⚠️ '+e.message});
+  }
+  save();renderChat();
+  sendBtn.disabled=false;sendBtn.textContent='送出';
+}
+document.getElementById('chatInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
+});
+
+// ── 初始化 ──────────────────────────────
+renderChat();
+renderNotes();
+if(state.context)showCtxStatus();
+if(state.gasUrl)refreshContext();
+</script>
+</body>
+</html>
