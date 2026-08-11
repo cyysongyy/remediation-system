@@ -92,6 +92,13 @@ textarea.fi{resize:vertical;min-height:56px;}
 .statusLine{font-size:.76rem;margin-top:8px;padding:8px 10px;border-radius:8px;}
 .statusLine.ok{background:rgba(5,150,105,.1);color:var(--ok);}
 .statusLine.bad{background:rgba(220,38,38,.1);color:var(--bad);}
+.linkRow{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;}
+.linkRow .row2{margin-bottom:6px;}
+.linkRow .row2 .fi{margin-bottom:0;}
+.linkRow .rmBtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:.76rem;float:right;}
+.linkRow .rmBtn:hover{color:var(--bad);}
+.linkChips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.linkChips a.chip{text-decoration:none;}
 </style>
 </head>
 <body>
@@ -121,6 +128,7 @@ textarea.fi{resize:vertical;min-height:56px;}
         <span id="ctxStatus">尚未載入雲端資料</span>
         <button onclick="refreshContext()">🔄 重新整理資料</button>
       </div>
+      <div class="linkChips" id="linkChips"></div>
       <div id="chatBox"></div>
       <div class="chips" id="chatChips">
         <span class="chip" onclick="quickAsk('今天有什麼行程？')">今天有什麼行程？</span>
@@ -209,6 +217,14 @@ textarea.fi{resize:vertical;min-height:56px;}
     </div>
 
     <div class="card">
+      <div class="section-title">🔗 我的其他 App</div>
+      <div class="hint" style="margin-bottom:10px;">你在 GitHub 上的其他自建 App，可在對話中快速開啟、也讓 Ybot 知道它們存在。若該 App 有自己的 Apps Script 後台網址，填入「後台網址」欄位，Ybot 每日簡報與對話會一併嘗試帶入其摘要（讀不到會自動略過）。</div>
+      <div id="linkList"></div>
+      <button class="btn ghost" onclick="addLinkRow()">＋ 新增 App</button>
+      <button class="btn" style="margin-left:8px;" onclick="saveLinksAll()">儲存</button>
+    </div>
+
+    <div class="card">
       <div class="section-title">🗑️ 資料管理</div>
       <button class="btn ghost" onclick="clearLocal()">清除本機資料（對話紀錄與筆記）</button>
     </div>
@@ -222,6 +238,11 @@ function defaults(){return{
   theme:'',
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
   gasUrl:'',remUrl:'',hltUrl:'',
+  links:[
+    {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
+    {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
+    {id:'footdrop-rehab',name:'垂足復健 5 步驟',url:'https://cyysongyy.github.io/5-steps-rehab-for-footdrop/',apiUrl:''}
+  ],
   notes:[],chat:[],
   context:null,contextAt:null
 };}
@@ -256,6 +277,7 @@ function fillSettings(){
   document.getElementById('gasUrl').value=state.gasUrl;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
+  renderLinks();
 }
 function saveSettings(showToast){
   state.ai.provider=document.getElementById('aiProvider').value;
@@ -286,6 +308,35 @@ async function testConnection(){
     if(d.ok){el.className='statusLine ok';el.textContent='✅ 連線成功：'+d.message;}
     else{el.className='statusLine bad';el.textContent='❌ '+(d.error||'連線失敗');}
   }catch(e){el.className='statusLine bad';el.textContent='❌ 連線失敗，請確認網址與部署設定';}
+}
+function renderLinks(){
+  const box=document.getElementById('linkList');
+  if(!box)return;
+  if(!state.links.length){box.innerHTML='<div class="empty">還沒有串聯的 App</div>';renderLinkChips();return;}
+  box.innerHTML=state.links.map((l,i)=>`
+    <div class="linkRow">
+      <button class="rmBtn" onclick="removeLinkRow(${i})">✕ 移除</button>
+      <div class="row2"><input class="fi" placeholder="名稱" value="${esc(l.name)}" onchange="state.links[${i}].name=this.value"></div>
+      <div class="row2"><input class="fi" placeholder="網頁網址 https://…" value="${esc(l.url)}" onchange="state.links[${i}].url=this.value"></div>
+      <div class="row2"><input class="fi" placeholder="後台 API 網址（選填）" value="${esc(l.apiUrl)}" onchange="state.links[${i}].apiUrl=this.value"></div>
+    </div>`).join('');
+  renderLinkChips();
+}
+function addLinkRow(){state.links.push({id:'app'+Date.now(),name:'',url:'',apiUrl:''});renderLinks();}
+function removeLinkRow(i){state.links.splice(i,1);renderLinks();}
+function renderLinkChips(){
+  const box=document.getElementById('linkChips');
+  if(!box)return;
+  const items=state.links.filter(l=>l.name&&l.url);
+  box.innerHTML=items.map(l=>`<a class="chip" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}</a>`).join('');
+}
+function saveLinksAll(){
+  save();renderLinkChips();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveOtherLinks',links:state.links})}).catch(()=>{});
+  }
+  alert('已儲存');
 }
 function clearLocal(){
   if(!confirm('確定清除本機的對話紀錄與筆記？（雲端資料不受影響）'))return;
@@ -438,12 +489,15 @@ function buildContextText(){
   if(pendingTodos.length)lines.push('未完成待辦：'+pendingTodos.map(n=>n.content).join('；'));
   if(pendingReminders.length)lines.push('提醒事項：'+pendingReminders.map(n=>`${n.content}（${n.dueAt?new Date(n.dueAt).toLocaleString('zh-TW'):''}）`).join('；'));
   if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,15).map(n=>n.content).join('；'));
+  const knownLinks=state.links.filter(l=>l.name&&l.url);
+  if(knownLinks.length)lines.push('使用者自建的其他 App：'+knownLinks.map(l=>`${l.name}(${l.url})`).join('；'));
   const c=state.context;
   if(c){
     if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
     if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.slice(0,8).map(m=>`${m.subject}(來自${m.from})`).join('；'));
     if(c.linked?.remediation)lines.push('考卷批改系統摘要：'+JSON.stringify(c.linked.remediation));
     if(c.linked?.health)lines.push('健康預測系統摘要：'+JSON.stringify(c.linked.health));
+    if(c.linked?.other&&Object.keys(c.linked.other).length)lines.push('其他串聯 App 摘要：'+JSON.stringify(c.linked.other));
   }
   return lines.join('\n')||'（目前沒有額外資料，如需行程/信件請先在「設定」連接雲端後台）';
 }
@@ -472,6 +526,7 @@ document.getElementById('chatInput').addEventListener('keydown',e=>{
 // ── 初始化 ──────────────────────────────
 renderChat();
 renderNotes();
+renderLinkChips();
 if(state.context)showCtxStatus();
 if(state.gasUrl)refreshContext();
 </script>

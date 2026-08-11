@@ -1,4 +1,4 @@
-> 🧭 **整合入口：[portal.html](portal.html)** — 一個入口連結三套系統（考卷批改 + 健康預測 + Ybot 個人助理），支援深/淺色主題。
+> 🧭 **整合入口：[portal.html](portal.html)** — 一個入口連結本 repo 三套系統（考卷批改 + 健康預測 + Ybot 個人助理），以及使用者其他 repo 的自建 App（校務助理／議題模擬／垂足復健），支援深/淺色主題。
 >
 > 🫀 **新增應用：[LifeSpan 健康預測](health.html)** — 個人健康管理與延壽系統。輸入健康數據即可預測生理年齡、預期壽命與慢性病相對風險，並取得個人化延壽建議。單一 HTML 檔、資料存於本機、可選接 AI 顧問。詳見下方「健康預測 App」說明。
 >
@@ -237,11 +237,13 @@ README.md                  ← 本說明文件
 | ⏰ 到點提醒 | 提醒時間一到，後台自動寄 Email 提醒（每 30 分鐘檢查一次） |
 | 🌅 每日簡報 | 每天早上 7 點自動寄「Ybot 每日簡報」：今日行程、逾期/到期待辦、未讀信件重點、AI 個人化提醒 |
 | 🔗 整合其他 App | 可串接本專案 `remediation-backend.gs`／`health-backend.gs`，對話與簡報一併帶入考卷批改、健康預測的最新摘要 |
+| 🧩 我的其他 App | 「設定 → 我的其他 App」可自由新增任何你自建的 App（名稱＋網頁網址，選填後台 API 網址），在對話快捷列一鍵開啟，Ybot 也會知道這些 App 的存在 |
 
 ### 🔗 資料串接方式
 
 - **行程／信件**：由 `ybot-backend.gs`（Google Apps Script）透過 `CalendarApp` / `GmailApp` 讀取你自己 Google 帳號的資料，只回傳給你自己部署的前端。
-- **其他 GitHub App**：在 Ybot「設定 → 整合其他系統」填入 `remediation-backend.gs`／`health-backend.gs` 的部署網址，Ybot 後台會伺服器對伺服器彙整近期成績/迷思概念、最新健康分與生理年齡等摘要。
+- **本專案其他系統**：在 Ybot「設定 → 整合其他系統」填入 `remediation-backend.gs`／`health-backend.gs` 的部署網址，Ybot 後台會伺服器對伺服器彙整近期成績/迷思概念、最新健康分與生理年齡等摘要。
+- **其他 GitHub repo 的自建 App**（例如 `principal-assistant`、`micro-politics`、`5-steps-rehab-for-footdrop`）：在「設定 → 我的其他 App」填入名稱與網址，預設已帶入這三個。若該 App 之後也部署了 Apps Script 後台，把後台網址填進「後台 API 網址」欄位，Ybot 每日簡報與對話會嘗試以 `?action=all` 拉取摘要（best-effort，讀不到會自動略過，不影響其他資料）。
 - **生活瑣事**：直接在「📝 待辦與筆記」輸入，Ybot 對話時會一併參考。
 
 ### ☁️ 雲端後台與自動化（`ybot-backend.gs`）

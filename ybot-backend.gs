@@ -143,6 +143,10 @@ function doPost(e) {
     writeKv({ remediationBackendUrl: body.remediationBackendUrl || '', healthBackendUrl: body.healthBackendUrl || '' });
     return jsonResp({ ok: true, message: '已儲存整合設定' });
   }
+  if (action === 'saveOtherLinks') {
+    writeKv({ otherLinksJson: JSON.stringify(body.links || []) });
+    return jsonResp({ ok: true, message: '已儲存其他 App 設定' });
+  }
   if (action === 'saveAiConfig') {
     setAiConfig(body.provider, body.key);
     return jsonResp({ ok: true, message: '已儲存 AI 設定' });
@@ -229,6 +233,21 @@ function getLinkedSummaries() {
       }
     } catch (err) { /* 忽略連線失敗 */ }
   }
+  // 使用者在「我的其他 App」自行填入的任意串聯 App（若有填後台 API 網址則嘗試best-effort讀取）
+  try {
+    const others = JSON.parse(kv.otherLinksJson || '[]');
+    const otherOut = {};
+    others.forEach(link => {
+      if (!link || !link.apiUrl) return;
+      try {
+        const res = UrlFetchApp.fetch(link.apiUrl + '?action=all', { muteHttpExceptions: true });
+        let text = res.getContentText() || '';
+        if (text.length > 1500) text = text.slice(0, 1500) + '…';
+        otherOut[link.name || link.apiUrl] = text;
+      } catch (err) { /* 忽略單一 App 連線失敗 */ }
+    });
+    if (Object.keys(otherOut).length) out.other = otherOut;
+  } catch (err) { /* 忽略解析失敗 */ }
   return out;
 }
 
