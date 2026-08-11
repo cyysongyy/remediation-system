@@ -1,6 +1,8 @@
-> 🧭 **整合入口：[portal.html](portal.html)** — 一個入口連結兩套系統（考卷批改 + 健康預測），支援深/淺色主題。
+> 🧭 **整合入口：[portal.html](portal.html)** — 一個入口連結三套系統（考卷批改 + 健康預測 + Ybot 個人助理），支援深/淺色主題。
 >
 > 🫀 **新增應用：[LifeSpan 健康預測](health.html)** — 個人健康管理與延壽系統。輸入健康數據即可預測生理年齡、預期壽命與慢性病相對風險，並取得個人化延壽建議。單一 HTML 檔、資料存於本機、可選接 AI 顧問。詳見下方「健康預測 App」說明。
+>
+> 🤖 **新增應用：[Ybot 個人助理](ybot.html)** — 整合行程、Gmail、待辦瑣事與本專案其他 App 的資料摘要，隨時問答、主動提醒。單一 HTML 檔、可選接 Google Apps Script 雲端後台。詳見下方「Ybot 個人助理」說明。
 
 ---
 
@@ -58,8 +60,13 @@
 ## 📁 檔案說明
 
 ```
-index.html                 ← 主程式（單一 HTML 檔，無需安裝）
-remediation-backend.gs     ← Google Apps Script 後台（選填）
+index.html                 ← 考卷批改主程式（單一 HTML 檔，無需安裝）
+remediation-backend.gs     ← 考卷批改 Google Apps Script 後台（選填）
+health.html                ← LifeSpan 健康預測 App
+health-backend.gs          ← 健康預測 Google Apps Script 後台（選填）
+ybot.html                  ← Ybot 個人助理 App
+ybot-backend.gs            ← Ybot Google Apps Script 後台（選填）
+portal.html                ← 三套系統的整合入口
 README.md                  ← 本說明文件
 ```
 
@@ -212,6 +219,47 @@ README.md                  ← 本說明文件
 > ⚠️ **免責聲明**：所有預測皆為基於公開流行病學研究的統計估算，僅供衛教與自我管理參考，**不能取代醫療診斷**。如有健康疑慮，請諮詢合格醫師。
 
 隱私：所有資料僅存於瀏覽器 `localStorage`；AI Key 僅存本機、直接呼叫 API，不經第三方伺服器。
+
+---
+
+## 🤖 Ybot 個人助理
+
+檔案：`ybot.html`（單一 HTML，瀏覽器直接開啟，或部署至 GitHub Pages）
+
+把「你做的所有 App」「Email」「生活瑣事」整合到一個可以隨時問、還會主動提醒的助理：
+
+| 功能 | 說明 |
+|---|---|
+| 💬 對話問答 | 接 Gemini / OpenAI / NVIDIA，隨時問行程、待辦、信件、任何生活瑣事 |
+| 📅 日曆彙整 | 自動讀取 Google 日曆未來 7 天行程，回答時自動帶入 |
+| 📬 Gmail 彙整 | 自動彙整近 2 天未讀信件（主旨／寄件者／摘要），可請 Ybot 幫忙摘要 |
+| 📝 待辦與筆記 | 三種類型：📌 瑣事筆記／✅ 待辦／⏰ 定時提醒，本機優先、可選雲端同步 |
+| ⏰ 到點提醒 | 提醒時間一到，後台自動寄 Email 提醒（每 30 分鐘檢查一次） |
+| 🌅 每日簡報 | 每天早上 7 點自動寄「Ybot 每日簡報」：今日行程、逾期/到期待辦、未讀信件重點、AI 個人化提醒 |
+| 🔗 整合其他 App | 可串接本專案 `remediation-backend.gs`／`health-backend.gs`，對話與簡報一併帶入考卷批改、健康預測的最新摘要 |
+
+### 🔗 資料串接方式
+
+- **行程／信件**：由 `ybot-backend.gs`（Google Apps Script）透過 `CalendarApp` / `GmailApp` 讀取你自己 Google 帳號的資料，只回傳給你自己部署的前端。
+- **其他 GitHub App**：在 Ybot「設定 → 整合其他系統」填入 `remediation-backend.gs`／`health-backend.gs` 的部署網址，Ybot 後台會伺服器對伺服器彙整近期成績/迷思概念、最新健康分與生理年齡等摘要。
+- **生活瑣事**：直接在「📝 待辦與筆記」輸入，Ybot 對話時會一併參考。
+
+### ☁️ 雲端後台與自動化（`ybot-backend.gs`）
+
+1. 開啟一份 Google 試算表 → **擴充功能** → **Apps Script**
+2. 貼上 `ybot-backend.gs` 的內容（取代原有內容）
+3. 執行一次 `setupDailyBrief()`（授權後排程每日 7 點自動簡報）
+4. 再執行一次 `setupReminderWatch()`（排程每 30 分鐘檢查一次到點提醒）
+5. **部署** → 新增部署作業 → 網頁應用程式
+   - 以下列身分執行：**我（Me）**
+   - 誰可以存取：**所有人（Anyone）**
+6. 複製部署網址 → 回到 `ybot.html`：**⚙️ 設定 → 雲端後台** → 貼上網址 → **🔌 測試連線**
+
+> ⚠️ 因為要讀取 Gmail／日曆，**重新部署後首次執行會要求你額外授權**，請同意（僅你本人帳號讀取，資料只回傳給你自己部署的前端，不經第三方伺服器）。
+
+**AI 個人化簡報（選填）**：在 Apps Script 編輯器執行一次 `setAiConfig('gemini','你的KEY')`（或 `'openai','sk-...'`），金鑰存於 Script Properties；之後每日簡報會附上 AI 生成的「今日提醒」。
+
+隱私：待辦／筆記與對話紀錄本機優先存於瀏覽器 `localStorage`；AI Key 僅存本機、直接呼叫 API。雲端後台為選填，資料只存在你自己的 Google 試算表。
 
 ---
 
