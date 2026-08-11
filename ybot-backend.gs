@@ -1,12 +1,14 @@
 /**
  * Ybot 個人助理 — Google Apps Script 後台
- * 待辦／筆記／提醒的雲端儲存 + Gmail／日曆彙整 + 每日主動簡報 + 到點提醒信
+ * 待辦／筆記／提醒的雲端儲存 + Gmail／日曆彙整 + 每日主動簡報（含🔴🟠🟢優先分級）
+ * + 到點提醒信 + 晚間彙整（只在有未處理事項時才寄，平時不打擾）
  *
  * 使用方式：
  * 1. 開啟一份 Google 試算表 → 擴充功能 → Apps Script
  * 2. 貼上此程式碼（取代所有內容）
  * 3. 執行一次 setupDailyBrief()（授權後排程「每日簡報」）
  *    再執行一次 setupReminderWatch()（排程「到點提醒」，每 30 分鐘檢查一次）
+ *    再執行一次 setupEveningDigest()（排程「晚間彙整」，只在有未處理事項時才寄信）
  * 4. 部署 → 新增部署作業 → 網頁應用程式
  *    - 以下列身分執行：我（Me）
  *    - 誰可以存取：所有人（Anyone）
@@ -143,6 +145,10 @@ function doPost(e) {
     writeKv({ remediationBackendUrl: body.remediationBackendUrl || '', healthBackendUrl: body.healthBackendUrl || '' });
     return jsonResp({ ok: true, message: '已儲存整合設定' });
   }
+  if (action === 'saveOtherLinks') {
+    writeKv({ otherLinksJson: JSON.stringify(body.links || []) });
+    return jsonResp({ ok: true, message: '已儲存其他 App 設定' });
+  }
   if (action === 'saveAiConfig') {
     setAiConfig(body.provider, body.key);
     return jsonResp({ ok: true, message: '已儲存 AI 設定' });
@@ -229,6 +235,21 @@ function getLinkedSummaries() {
       }
     } catch (err) { /* 忽略連線失敗 */ }
   }
+  // 使用者在「我的其他 App」自行填入的任意串聯 App（若有填後台 API 網址則嘗試best-effort讀取）
+  try {
+    const others = JSON.parse(kv.otherLinksJson || '[]');
+    const otherOut = {};
+    others.forEach(link => {
+      if (!link || !link.apiUrl) return;
+      try {
+        const res = UrlFetchApp.fetch(link.apiUrl + '?action=all', { muteHttpExceptions: true });
+        let text = res.getContentText() || '';
+        if (text.length > 1500) text = text.slice(0, 1500) + '…';
+        otherOut[link.name || link.apiUrl] = text;
+      } catch (err) { /* 忽略單一 App 連線失敗 */ }
+    });
+    if (Object.keys(otherOut).length) out.other = otherOut;
+  } catch (err) { /* 忽略解析失敗 */ }
   return out;
 }
 
@@ -246,10 +267,9 @@ function dailyBrief() {
   const email = NOTIFY_EMAIL || getOwnerEmail();
   if (!email) return;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const overdue = ctx.notes.filter(n => n.type !== 'note' && n.done !== 'true' && n.dueAt && n.dueAt.slice(0, 10) < today);
-  const dueToday = ctx.notes.filter(n => n.type !== 'note' && n.done !== 'true' && n.dueAt && n.dueAt.slice(0, 10) === today);
-  const openTodos = ctx.notes.filter(n => n.type === 'todo' && n.done !== 'true' && !n.dueAt);
+  const { items: priorities, narrative } = buildPriorities(ctx);
+  const groups = { red: [], orange: [], green: [] };
+  priorities.forEach(p => groups[p.level].push(p));
 
   let lines = [`【Ybot 每日簡報】${new Date().toLocaleDateString('zh-TW')}`, ''];
 
@@ -261,15 +281,20 @@ function dailyBrief() {
     });
     lines.push('');
   }
-  if (overdue.length || dueToday.length) {
-    lines.push('⏰ 待辦與提醒：');
-    overdue.forEach(n => lines.push(`　🔴 已逾期：${n.content}（${n.dueAt.slice(0, 10)}）`));
-    dueToday.forEach(n => lines.push(`　🟡 今天到期：${n.content}`));
-    lines.push('');
-  }
-  if (openTodos.length) {
-    lines.push(`📝 未完成待辦（無期限）共 ${openTodos.length} 項：`);
-    openTodos.slice(0, 8).forEach(n => lines.push(`　・${n.content}`));
+  if (priorities.length) {
+    lines.push(`🎯 今天真正需要處理（共 ${priorities.length} 項，含今明行程）：`);
+    if (groups.red.length) {
+      lines.push('🔴 今天必須：');
+      groups.red.forEach(p => lines.push(fmtItemLine(p)));
+    }
+    if (groups.orange.length) {
+      lines.push('🟠 建議今天：');
+      groups.orange.forEach(p => lines.push(fmtItemLine(p)));
+    }
+    if (groups.green.length) {
+      lines.push(`🟢 可以延後（共 ${groups.green.length} 項，僅列前 5）：`);
+      groups.green.slice(0, 5).forEach(p => lines.push(fmtItemLine(p)));
+    }
     lines.push('');
   }
   if (ctx.gmail.length) {
@@ -287,8 +312,7 @@ function dailyBrief() {
   }
   lines.push('');
 
-  const aiText = aiDailyNarrative(ctx, overdue, dueToday);
-  if (aiText) lines.push(aiText);
+  if (narrative) lines.push('💬 Ybot 想跟你說：\n' + narrative + '\n');
 
   lines.push('（本簡報由 Ybot 後台每日自動產生。）');
   const summary = lines.join('\n');
@@ -297,18 +321,80 @@ function dailyBrief() {
   try { MailApp.sendEmail(email, '🤖 Ybot 每日簡報', summary); } catch (err) { }
 }
 
-function aiDailyNarrative(ctx, overdue, dueToday) {
+// 把「待辦／提醒」與「今明的行程」合併分成 🔴今天必須／🟠建議今天／🟢可延後，
+// 規則先判斷（有到期日／行程時間就照時間分級），AI 只負責「升級」沒有到期日、但內容看起來緊急的
+// 待辦事項（不會動到行程），不確定就不動——避免 AI 亂猜出不存在的急迫性。
+// 較遠期（3天以上）的行程不併入這裡，避免跟下面「📅 未來行程」整週清單重複列。
+function buildPriorities(ctx) {
+  const now = new Date();
+  const actionable = ctx.notes.filter(n => n.type !== 'note' && n.done !== 'true');
+  const todoItems = actionable.map(n => ({ id: n.id, type: n.type, content: n.content, dueAt: n.dueAt, level: ruleLevel(n, now) }));
+  const ai = aiPrioritize(todoItems, ctx);
+  (ai.upgrades || []).forEach(u => {
+    const it = todoItems.find(x => x.id === u.id);
+    if (it && (u.level === 'red' || u.level === 'orange') && rank(u.level) > rank(it.level)) it.level = u.level;
+  });
+
+  const eventItems = (ctx.calendar || [])
+    .map((ev, i) => ({ id: 'evt' + i, type: 'event', content: ev.title, dueAt: ev.start, allDay: ev.allDay, level: eventLevel(ev, now) }))
+    .filter(e => e.level !== 'green');
+
+  const items = todoItems.concat(eventItems);
+  items.sort((a, b) => rank(b.level) - rank(a.level));
+  return { items, narrative: ai.narrative || '' };
+}
+function ruleLevel(n, now) {
+  if (!n.dueAt) return 'green';
+  const diffDays = (new Date(n.dueAt) - now) / 86400000;
+  if (diffDays <= 1) return 'red';
+  if (diffDays <= 3) return 'orange';
+  return 'green';
+}
+function eventLevel(ev, now) {
+  const diffDays = (new Date(ev.start) - now) / 86400000;
+  if (diffDays < 0) return 'green'; // 已開始/已過，不再算今天要處理
+  if (diffDays <= 1) return 'red'; // 今天
+  if (diffDays <= 2) return 'orange'; // 明天，先提醒你準備
+  return 'green';
+}
+function rank(level) { return { green: 0, orange: 1, red: 2 }[level] || 0; }
+function fmtDue(dueAt) {
+  try { return new Date(dueAt).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch (err) { return dueAt; }
+}
+function fmtItemLine(p) {
+  if (p.type === 'event') {
+    const t = p.allDay ? '全天' : fmtDue(p.dueAt);
+    return `　📅 ${t}　${p.content}`;
+  }
+  return `　・${p.content}${p.dueAt ? '（' + fmtDue(p.dueAt) + '）' : ''}`;
+}
+
+// AI 輔助分級 + 今日提醒文字（選填，需先設定 AI Key）。單一次呼叫回傳 JSON，
+// 只允許「升級」清單內既有項目，不允許新增清單外的項目，避免幻覺。
+function aiPrioritize(items, ctx) {
   const { key } = getAiConfig();
-  if (!key) return '';
-  const prompt = `你是使用者 Young 的個人助理 Ybot，個性溫暖直接。以下是今天的彙整資料：\n` +
-    `行程：${JSON.stringify(ctx.calendar.slice(0, 8))}\n` +
-    `逾期：${overdue.map(n => n.content).join('、') || '無'}\n` +
-    `今天到期：${dueToday.map(n => n.content).join('、') || '無'}\n` +
-    `未讀重要信件數：${ctx.gmail.length}\n` +
+  if (!key || !items.length) return {};
+  const prompt = `你是 Young 的個人行政幕僚 Ybot，個性溫暖直接。以下是他目前的待辦／提醒清單（JSON），每項已有初步等級（red=今天必須, orange=建議今天, green=可延後）：\n` +
+    JSON.stringify(items.map(i => ({ id: i.id, content: i.content, dueAt: i.dueAt, level: i.level }))) + '\n\n' +
+    `背景資訊（僅供你判斷是否要升級等級，不要新增清單外的項目、不要臆測不存在的細節）：\n` +
+    `未讀信件主旨：${JSON.stringify(ctx.gmail.slice(0, 8).map(m => m.subject))}\n` +
+    `未來行程：${JSON.stringify(ctx.calendar.slice(0, 8).map(e => e.title))}\n` +
     `其他系統摘要：${JSON.stringify(ctx.linked)}\n\n` +
-    `請用繁體中文寫一段 150 字內的「今日提醒」，語氣自然像朋友提醒、不要條列重複上面已列的內容，重點放在「今天最該優先做的 1-2 件事」與一句鼓勵。`;
-  const out = callAI(prompt);
-  return out ? ('💬 Ybot 想跟你說：\n' + out + '\n') : '';
+    `請完成兩件事，只回傳一個 JSON 物件，不要有任何其他文字或說明：\n` +
+    `1. upgrades：陣列，只列出你「有把握」該升級等級的項目（例如沒有到期日但內容明顯緊急），格式 [{"id":"...","level":"red"}]，沒有就給空陣列，不確定的不要動。\n` +
+    `2. narrative：100 字內的繁體中文「今日提醒」，語氣像朋友提醒，聚焦在今天最該優先做的 1-2 件事並給一句鼓勵，不要條列複誦清單內容。\n\n` +
+    `輸出格式：{"upgrades":[...],"narrative":"..."}`;
+  const raw = callAI(prompt);
+  if (!raw) return {};
+  try {
+    const match = raw.match(/\{[\s\S]*\}/);
+    const obj = JSON.parse(match ? match[0] : raw);
+    return {
+      upgrades: Array.isArray(obj.upgrades) ? obj.upgrades : [],
+      narrative: typeof obj.narrative === 'string' ? obj.narrative : ''
+    };
+  } catch (err) { return {}; }
 }
 
 // ── 自動化：到點提醒（每 30 分鐘檢查一次）──────
@@ -334,6 +420,35 @@ function reminderWatch() {
       updatePartial(note, NOTE_COLS, n.id, { notifiedAt: new Date().toISOString() });
     } catch (err) { /* 忽略單筆寄送失敗 */ }
   });
+}
+
+// ── 自動化：晚間彙整（只在有事沒處理時才寄，不打擾）──
+// 早上簡報看過的事，如果晚上還沒完成，累積提醒一次；沒有待處理事項就完全不寄信。
+function setupEveningDigest() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'eveningDigest') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('eveningDigest').timeBased().everyDays(1).atHour(20).create();
+  return '✅ 已排程每天晚上 8 點檢查（有未處理的🔴/🟠事項才會寄信，沒有就不打擾）';
+}
+
+function eveningDigest() {
+  const ctx = buildContext();
+  const email = NOTIFY_EMAIL || getOwnerEmail();
+  if (!email) return;
+
+  const { items } = buildPriorities(ctx);
+  const pending = items.filter(p => p.level === 'red' || p.level === 'orange');
+  if (!pending.length) return; // 沒有需要留意的事，不寄信
+
+  let lines = [`【Ybot 晚間提醒】${new Date().toLocaleDateString('zh-TW')}`, '', `還有 ${pending.length} 項需要留意：`];
+  pending.slice(0, 8).forEach(p => {
+    const flag = p.level === 'red' ? '🔴' : '🟠';
+    const label = p.type === 'event' ? `${flag} 📅 ${p.allDay ? '全天' : fmtDue(p.dueAt)}　${p.content}` : `${flag} ${p.content}${p.dueAt ? '（' + fmtDue(p.dueAt) + '）' : ''}`;
+    lines.push('　' + label);
+  });
+  lines.push('', '（僅在有待留意事項時才會寄這封信。）');
+  try { MailApp.sendEmail(email, '🌙 Ybot 晚間提醒', lines.join('\n')); } catch (err) { }
 }
 
 function getOwnerEmail() {
