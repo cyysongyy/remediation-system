@@ -99,6 +99,19 @@ textarea.fi{resize:vertical;min-height:56px;}
 .linkRow .rmBtn:hover{color:var(--bad);}
 .linkChips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
 .linkChips a.chip{text-decoration:none;}
+
+/* Overview */
+.ovSection{margin-bottom:12px;}
+.ovSection:last-child{margin-bottom:0;}
+.ovLabel{font-size:.78rem;font-weight:800;color:var(--pri);margin-bottom:6px;}
+.ovItem{font-size:.84rem;line-height:1.6;padding:2px 0;}
+.ovItem a{color:var(--tx);text-decoration:none;}
+.ovItem a:hover{color:var(--pri);text-decoration:underline;}
+.ovSub{color:var(--tx3);font-size:.76rem;}
+.ovEmpty{color:var(--tx3);}
+.ovNewsGroup{margin-bottom:6px;}
+.ovNewsGroup:last-child{margin-bottom:0;}
+.ovNewsGroup b{font-size:.78rem;color:var(--tx2);}
 </style>
 </head>
 <body>
@@ -123,6 +136,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 
   <!-- 💬 對話 -->
   <div class="pane active" id="pane-chat">
+    <div class="card" id="overviewCard" style="display:none;"></div>
     <div class="card">
       <div class="ctxbar">
         <span id="ctxStatus">尚未載入雲端資料</span>
@@ -428,6 +442,7 @@ async function refreshContext(){
       state.notes=[...cloudNotes,...localOnly];save();
       renderNotes();
       showCtxStatus();
+      renderOverview();
     }else{document.getElementById('ctxStatus').textContent='❌ '+(d.error||'讀取失敗');}
   }catch(e){document.getElementById('ctxStatus').textContent='❌ 讀取失敗，請確認後台網址';}
 }
@@ -435,6 +450,45 @@ function showCtxStatus(){
   const t=state.contextAt?new Date(state.contextAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}):'';
   const c=state.context;
   document.getElementById('ctxStatus').textContent=c?`📡 資料更新於 ${t} · 📅${(c.calendar||[]).length}行程 · 📬${(c.gmail||[]).length}未讀信`:'尚未載入雲端資料';
+}
+
+// ── 首頁主動總覽：今日行程／重要 Email／今日新聞 ──
+function renderOverview(){
+  const box=document.getElementById('overviewCard');
+  const c=state.context;
+  if(!c){box.style.display='none';box.innerHTML='';return;}
+
+  const todayStr=new Date().toDateString();
+  const todayEvents=(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr);
+  const scheduleHtml=todayEvents.length
+    ? todayEvents.map(ev=>{
+        const t=ev.allDay?'全天':new Date(ev.start).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+        return `<div class="ovItem">${esc(t)}　${esc(ev.title)}</div>`;
+      }).join('')
+    : `<div class="ovItem ovEmpty">今天沒有排定的行程</div>`;
+
+  const mails=(c.gmail||[]).slice(0,3);
+  const mailHtml=mails.length
+    ? mails.map(m=>`<div class="ovItem">${esc(m.subject)} <span class="ovSub">（${esc(m.from)}）</span></div>`).join('')
+    : `<div class="ovItem ovEmpty">沒有未讀的重要信件</div>`;
+
+  const news=c.news||{};
+  const newsGroups=[['國內',news.domestic],['國際',news.world],['教育',news.education]];
+  const hasNews=newsGroups.some(([,list])=>list&&list.length);
+  const newsHtml=hasNews
+    ? newsGroups.filter(([,list])=>list&&list.length).map(([label,list])=>
+        `<div class="ovNewsGroup"><b>${label}</b>`+
+        list.map(n=>`<div class="ovItem">・<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a></div>`).join('')+
+        `</div>`
+      ).join('')
+    : `<div class="ovItem ovEmpty">暫無新聞資料</div>`;
+
+  box.innerHTML=
+    `<div class="section-title">☀️ 今日總覽</div>`+
+    `<div class="ovSection"><div class="ovLabel">📅 今日行程</div>${scheduleHtml}</div>`+
+    `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
+    `<div class="ovSection"><div class="ovLabel">📰 今日新聞</div>${newsHtml}</div>`;
+  box.style.display='block';
 }
 
 // ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
@@ -495,6 +549,11 @@ function buildContextText(){
   if(c){
     if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
     if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.slice(0,8).map(m=>`${m.subject}(來自${m.from})`).join('；'));
+    if(c.news){
+      const n=c.news;
+      const newsFlat=[...(n.domestic||[]),...(n.world||[]),...(n.education||[])];
+      if(newsFlat.length)lines.push('今日新聞：'+newsFlat.map(x=>x.title).join('；'));
+    }
     if(c.linked?.remediation)lines.push('考卷批改系統摘要：'+JSON.stringify(c.linked.remediation));
     if(c.linked?.health)lines.push('健康預測系統摘要：'+JSON.stringify(c.linked.health));
     if(c.linked?.other&&Object.keys(c.linked.other).length)lines.push('其他串聯 App 摘要：'+JSON.stringify(c.linked.other));
@@ -527,7 +586,7 @@ document.getElementById('chatInput').addEventListener('keydown',e=>{
 renderChat();
 renderNotes();
 renderLinkChips();
-if(state.context)showCtxStatus();
+if(state.context){showCtxStatus();renderOverview();}
 if(state.gasUrl)refreshContext();
 </script>
 </body>

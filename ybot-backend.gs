@@ -156,13 +156,14 @@ function doPost(e) {
   return jsonResp({ ok: false, error: 'Unknown action: ' + action });
 }
 
-// ── 彙整上下文：Gmail + 日曆 + 待辦提醒 + 其他系統摘要 ──
+// ── 彙整上下文：Gmail + 日曆 + 新聞 + 待辦提醒 + 其他系統摘要 ──
 function buildContext() {
   return {
     generatedAt: new Date().toISOString(),
     notes: sheetToObjects(setupSheets().note, NOTE_COLS),
     gmail: getGmailDigest(),
     calendar: getCalendarDigest(),
+    news: getNewsDigest(),
     linked: getLinkedSummaries()
   };
 }
@@ -197,6 +198,33 @@ function getCalendarDigest() {
       start: ev.getStartTime().toISOString(),
       end: ev.getEndTime().toISOString(),
       allDay: ev.isAllDayEvent()
+    }));
+  } catch (err) { return []; }
+}
+
+// 新聞彙整：國內／國際／教育各 2 則，來源 Google 新聞 RSS（免金鑰）。
+// 快取 30 分鐘，避免每次開啟 Ybot 或重新整理都重打新聞來源。
+function getNewsDigest() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('newsDigest');
+  if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
+  const out = {
+    domestic: fetchNewsRss('https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
+    world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
+    education: fetchNewsRss('https://news.google.com/rss/search?q=%E6%95%99%E8%82%B2&hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2)
+  };
+  try { cache.put('newsDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過 CacheService 容量就不快取，下次仍會重抓 */ }
+  return out;
+}
+function fetchNewsRss(url, limit) {
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return [];
+    const doc = XmlService.parse(res.getContentText());
+    const items = doc.getRootElement().getChild('channel').getChildren('item');
+    return items.slice(0, limit).map(it => ({
+      title: it.getChildText('title') || '',
+      link: it.getChildText('link') || ''
     }));
   } catch (err) { return []; }
 }
@@ -300,6 +328,14 @@ function dailyBrief() {
   if (ctx.gmail.length) {
     lines.push(`📬 未讀重要信件（近 2 天，共 ${ctx.gmail.length} 封）：`);
     ctx.gmail.slice(0, 5).forEach(m => lines.push(`　・${m.subject}（${m.from}）`));
+    lines.push('');
+  }
+  const news = ctx.news || {};
+  if ((news.domestic || []).length || (news.world || []).length || (news.education || []).length) {
+    lines.push('📰 今日新聞：');
+    if ((news.domestic || []).length) { lines.push('　國內：'); news.domestic.forEach(n => lines.push(`　　・${n.title}`)); }
+    if ((news.world || []).length) { lines.push('　國際：'); news.world.forEach(n => lines.push(`　　・${n.title}`)); }
+    if ((news.education || []).length) { lines.push('　教育：'); news.education.forEach(n => lines.push(`　　・${n.title}`)); }
     lines.push('');
   }
   if (ctx.linked.remediation) {
