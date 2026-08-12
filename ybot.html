@@ -113,6 +113,8 @@ textarea.fi{resize:vertical;min-height:56px;}
 .ovNewsGroup{margin-bottom:6px;}
 .ovNewsGroup:last-child{margin-bottom:0;}
 .ovNewsGroup b{font-size:.78rem;color:var(--tx2);}
+.ovLabelToggle{cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;}
+.ovToggleIcon{font-size:.68rem;color:var(--tx3);}
 
 /* Clock */
 .clockBox{position:fixed;top:16px;right:62px;z-index:9;text-align:right;
@@ -279,7 +281,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 // ── 狀態管理 ─────────────────────────────
 const LS_KEY='ybot_v1';
 function defaults(){return{
-  theme:'',fontScale:1,
+  theme:'',fontScale:1,newsCollapsed:false,
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
   gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
   links:[
@@ -580,13 +582,19 @@ function renderOverview(){
       ).join('')
     : `<div class="ovItem ovEmpty">暫無新聞資料</div>`;
 
+  const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
     `<div class="section-title">☀️ 今日總覽</div>`+
     `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📅 今日行程</div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
-    `<div class="ovSection"><div class="ovLabel">📰 今日新聞</div>${newsHtml}</div>`;
+    `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`;
   box.style.display='block';
+}
+function toggleNewsCollapse(){
+  state.newsCollapsed=!state.newsCollapsed;
+  save();
+  renderOverview();
 }
 
 // ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
