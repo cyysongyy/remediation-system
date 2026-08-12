@@ -535,6 +535,7 @@ function readCdInputMin(fallback){
 }
 function toggleCountdown(){cdRunning?pauseCountdown():startCountdown();}
 function startCountdown(){
+  unlockCdAudio(); // 按下開始是一次真正的使用者點擊，趁機解鎖音效，之後倒數結束（非點擊觸發）才播得出聲音
   if(cdRemainingSec<=0)cdRemainingSec=readCdInputMin(5)*60;
   cdRunning=true;
   setCdRunningUI(true);
@@ -571,14 +572,31 @@ function resetCountdown(){
   cdRemainingSec=min*60;
   renderCountdown();
 }
+// iOS/Safari 規定音效一定要在「使用者點擊」當下解鎖 AudioContext，
+// 之後才能在非點擊觸發的情境（例如倒數計時自然跑完）播出聲音；
+// 所以在 startCountdown()（真正的點擊事件）先呼叫這個解鎖，供 countdownAlert() 之後重複使用。
+let cdAudioCtx=null;
+function unlockCdAudio(){
+  try{
+    if(!cdAudioCtx)cdAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(cdAudioCtx.state==='suspended')cdAudioCtx.resume();
+  }catch(e){/* 瀏覽器不支援 Web Audio 就略過，畫面上的彈窗提醒仍會出現 */}
+}
 function countdownAlert(){
   try{
-    const ctx=new(window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(),g=ctx.createGain();
-    o.connect(g);g.connect(ctx.destination);
-    o.frequency.value=880;g.gain.value=.15;
-    o.start();setTimeout(()=>{o.stop();ctx.close();},600);
-  }catch(e){/* 部分瀏覽器會擋自動播音，忽略即可 */}
+    if(!cdAudioCtx)cdAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(cdAudioCtx.state==='suspended')cdAudioCtx.resume();
+    const now=cdAudioCtx.currentTime;
+    for(let i=0;i<4;i++){
+      const o=cdAudioCtx.createOscillator(),g=cdAudioCtx.createGain();
+      o.connect(g);g.connect(cdAudioCtx.destination);
+      o.frequency.value=i%2===0?880:660;
+      g.gain.value=.25;
+      const t=now+i*0.35;
+      o.start(t);o.stop(t+0.25);
+    }
+  }catch(e){/* 部分瀏覽器仍會擋自動播音，忽略即可，畫面彈窗提醒還是會出現 */}
+  if(navigator.vibrate)try{navigator.vibrate([200,100,200,100,200]);}catch(e){/* 忽略 */}
   alert('⏱️ 時間到！');
 }
 function saveWeatherLocation(){
