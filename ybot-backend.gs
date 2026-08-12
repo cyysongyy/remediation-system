@@ -1,7 +1,7 @@
 /**
  * Ybot 個人助理 — Google Apps Script 後台
  * 待辦／筆記／提醒的雲端儲存 + Gmail／日曆彙整 + 每日主動簡報（含🔴🟠🟢優先分級）
- * + 到點提醒信 + 晚間彙整（只在有未處理事項時才寄，平時不打擾）+ 起立提醒
+ * + 到點提醒信 + 晚間彙整（只在有未處理事項時才寄，平時不打擾）+ 起立提醒 + 本週回顧
  *
  * 使用方式：
  * 1. 開啟一份 Google 試算表 → 擴充功能 → Apps Script
@@ -10,6 +10,7 @@
  *    再執行一次 setupReminderWatch()（排程「到點提醒」，每 30 分鐘檢查一次）
  *    再執行一次 setupEveningDigest()（排程「晚間彙整」，只在有未處理事項時才寄信）
  *    再執行一次 setupStandupWatch()（排程「起立提醒」，實際頻率依 ybot.html 設定調整）
+ *    再執行一次 setupWeeklyReview()（排程「本週回顧」，每週一早上 7 點）
  * 4. 部署 → 新增部署作業 → 網頁應用程式
  *    - 以下列身分執行：我（Me）
  *    - 誰可以存取：所有人（Anyone）
@@ -475,6 +476,12 @@ function dailyBrief() {
     const h = ctx.linked.health;
     lines.push(`🫀 健康：最新健康分 ${h.score}，生理年齡 ${h.bio}（${h.date}）`);
   }
+  if (ctx.linked.other && Object.keys(ctx.linked.other).length) {
+    lines.push('🧩 其他串聯 App：');
+    Object.entries(ctx.linked.other).forEach(([name, text]) => {
+      lines.push(`　・${name}：${String(text).slice(0, 200)}`);
+    });
+  }
   lines.push('');
 
   if (narrative) lines.push('💬 Ybot 想跟你說：\n' + narrative + '\n');
@@ -585,6 +592,65 @@ function reminderWatch() {
       updatePartial(note, NOTE_COLS, n.id, { notifiedAt: new Date().toISOString() });
     } catch (err) { /* 忽略單筆寄送失敗 */ }
   });
+}
+
+// ── 自動化：本週回顧（每週一早上 7 點）──
+// 注意：這是「本週活動摘要＋目前狀態快照」，不是「跟上週比較的趨勢」——
+// 因為目前沒有存歷史快照，做不出真正的週對週比較，誠實只呈現看得到的資料。
+function setupWeeklyReview() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'weeklyReview') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('weeklyReview').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(7).create();
+  return '✅ 已排程每週一早上 7 點產生本週回顧';
+}
+
+function weeklyReview() {
+  const email = NOTIFY_EMAIL || getOwnerEmail();
+  if (!email) return;
+  const ctx = buildContext();
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const allNotes = sheetToObjects(setupSheets().note, NOTE_COLS);
+  const addedThisWeek = allNotes.filter(n => n.createdAt && new Date(n.createdAt) >= weekAgo);
+  const decisionNotesThisWeek = allNotes.filter(n => n.type === 'note' && n.createdAt && new Date(n.createdAt) >= weekAgo);
+
+  let lines = [`【Ybot 本週回顧】${new Date().toLocaleDateString('zh-TW')}`, ''];
+  lines.push(`📝 本週新增 ${addedThisWeek.length} 筆（待辦／提醒／瑣事）`);
+  if (decisionNotesThisWeek.length) {
+    lines.push('📌 本週瑣事筆記：');
+    decisionNotesThisWeek.slice(0, 15).forEach(n => lines.push(`　・${n.content}`));
+  }
+  lines.push('');
+  if (ctx.linked.remediation) {
+    const r = ctx.linked.remediation;
+    lines.push(`🎯 考卷批改目前狀態：累計 ${r.totalSubmissions} 筆，近期平均 ${r.recentAvgPercentage ?? '—'}%，常見迷思：${(r.topMisconceptions || []).join('、') || '無'}`);
+  }
+  if (ctx.linked.health) {
+    const h = ctx.linked.health;
+    lines.push(`🫀 健康目前狀態：健康分 ${h.score}，生理年齡 ${h.bio}（${h.date}）`);
+  }
+  if (ctx.linked.other && Object.keys(ctx.linked.other).length) {
+    lines.push('🧩 其他串聯 App：');
+    Object.entries(ctx.linked.other).forEach(([name, text]) => lines.push(`　・${name}：${String(text).slice(0, 200)}`));
+  }
+  lines.push('');
+
+  const narrative = aiWeeklyNarrative(addedThisWeek, decisionNotesThisWeek, ctx);
+  if (narrative) lines.push('💬 Ybot 本週小結：\n' + narrative + '\n');
+
+  lines.push('（本回顧由 Ybot 後台每週一自動產生，內容為本週活動摘要與目前狀態，非跨週趨勢比較。）');
+  try { MailApp.sendEmail(email, '🗓️ Ybot 本週回顧', lines.join('\n')); } catch (err) { }
+}
+
+function aiWeeklyNarrative(addedThisWeek, decisionNotesThisWeek, ctx) {
+  const { key } = getAiConfig();
+  if (!key) return '';
+  const prompt = `你是 Young 的個人行政幕僚 Ybot，個性溫暖直接。以下是本週資料：\n` +
+    `本週新增待辦/提醒/瑣事共 ${addedThisWeek.length} 筆\n` +
+    `本週瑣事筆記：${JSON.stringify(decisionNotesThisWeek.map(n => n.content))}\n` +
+    `其他系統目前狀態：${JSON.stringify(ctx.linked)}\n\n` +
+    `請用繁體中文寫一段 120 字內的「本週小結」，語氣溫暖直接，重點放在這週值得注意的事跟一句給下週的建議，不要條列複誦上面內容，不要臆測不存在的細節。`;
+  return callAI(prompt);
 }
 
 // ── 自動化：晚間彙整（只在有事沒處理時才寄，不打擾）──
