@@ -1,7 +1,7 @@
 /**
  * Ybot 個人助理 — Google Apps Script 後台
  * 待辦／筆記／提醒的雲端儲存 + Gmail／日曆彙整 + 每日主動簡報（含🔴🟠🟢優先分級）
- * + 到點提醒信 + 晚間彙整（只在有未處理事項時才寄，平時不打擾）
+ * + 到點提醒信 + 晚間彙整（只在有未處理事項時才寄，平時不打擾）+ 起立提醒
  *
  * 使用方式：
  * 1. 開啟一份 Google 試算表 → 擴充功能 → Apps Script
@@ -9,6 +9,7 @@
  * 3. 執行一次 setupDailyBrief()（授權後排程「每日簡報」）
  *    再執行一次 setupReminderWatch()（排程「到點提醒」，每 30 分鐘檢查一次）
  *    再執行一次 setupEveningDigest()（排程「晚間彙整」，只在有未處理事項時才寄信）
+ *    再執行一次 setupStandupWatch()（排程「起立提醒」，實際頻率依 ybot.html 設定調整）
  * 4. 部署 → 新增部署作業 → 網頁應用程式
  *    - 以下列身分執行：我（Me）
  *    - 誰可以存取：所有人（Anyone）
@@ -158,10 +159,19 @@ function doPost(e) {
     CacheService.getScriptCache().remove('weatherDigest'); // 換地點後清掉舊快取，下次立刻抓新地點
     return jsonResp({ ok: true, message: '已儲存天氣地點' });
   }
+  if (action === 'saveStandupSettings') {
+    writeKv({
+      standupEnabled: body.enabled ? 'true' : '',
+      standupIntervalMin: String(body.intervalMin || 60),
+      standupStartHour: String(body.startHour ?? 8),
+      standupEndHour: String(body.endHour ?? 18)
+    });
+    return jsonResp({ ok: true, message: '已儲存起立提醒設定' });
+  }
   return jsonResp({ ok: false, error: 'Unknown action: ' + action });
 }
 
-// ── 彙整上下文：Gmail + 日曆 + 新聞 + 天氣 + 待辦提醒 + 其他系統摘要 ──
+// ── 彙整上下文：Gmail + 日曆 + 新聞 + 天氣 + 起立提醒設定 + 待辦提醒 + 其他系統摘要 ──
 function buildContext() {
   return {
     generatedAt: new Date().toISOString(),
@@ -170,7 +180,17 @@ function buildContext() {
     calendar: getCalendarDigest(),
     news: getNewsDigest(),
     weather: getWeatherDigest(),
+    standup: getStandupSettings(),
     linked: getLinkedSummaries()
+  };
+}
+function getStandupSettings() {
+  const kv = readKv();
+  return {
+    enabled: kv.standupEnabled === 'true',
+    intervalMin: Number(kv.standupIntervalMin || 60),
+    startHour: Number(kv.standupStartHour ?? 8),
+    endHour: Number(kv.standupEndHour ?? 18)
   };
 }
 
@@ -204,7 +224,7 @@ function getCalendarDigest() {
     const now = new Date();
     const until = new Date(now.getTime() + 7 * 86400000);
     const events = CalendarApp.getDefaultCalendar().getEvents(now, until);
-    return events.slice(0, 20).map(ev => ({
+    return events.slice(0, 50).map(ev => ({
       title: ev.getTitle(),
       start: ev.getStartTime().toISOString(),
       end: ev.getEndTime().toISOString(),
@@ -412,7 +432,7 @@ function dailyBrief() {
   }
   if (ctx.calendar.length) {
     lines.push('📅 未來行程：');
-    ctx.calendar.slice(0, 8).forEach(ev => {
+    ctx.calendar.forEach(ev => {
       const t = ev.allDay ? '全天' : new Date(ev.start).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       lines.push(`　${t}　${ev.title}`);
     });
@@ -524,7 +544,7 @@ function aiPrioritize(items, ctx) {
     JSON.stringify(items.map(i => ({ id: i.id, content: i.content, dueAt: i.dueAt, level: i.level }))) + '\n\n' +
     `背景資訊（僅供你判斷是否要升級等級，不要新增清單外的項目、不要臆測不存在的細節）：\n` +
     `未讀信件主旨：${JSON.stringify(ctx.gmail.slice(0, 8).map(m => m.subject))}\n` +
-    `未來行程：${JSON.stringify(ctx.calendar.slice(0, 8).map(e => e.title))}\n` +
+    `未來行程：${JSON.stringify(ctx.calendar.map(e => e.title))}\n` +
     `其他系統摘要：${JSON.stringify(ctx.linked)}\n\n` +
     `請完成兩件事，只回傳一個 JSON 物件，不要有任何其他文字或說明：\n` +
     `1. upgrades：陣列，只列出你「有把握」該升級等級的項目（例如沒有到期日但內容明顯緊急），格式 [{"id":"...","level":"red"}]，沒有就給空陣列，不確定的不要動。\n` +
@@ -594,6 +614,50 @@ function eveningDigest() {
   });
   lines.push('', '（僅在有待留意事項時才會寄這封信。）');
   try { MailApp.sendEmail(email, '🌙 Ybot 晚間提醒', lines.join('\n')); } catch (err) { }
+}
+
+// ── 自動化：起立提醒（每 15 分鐘檢查一次，依設定的間隔與時段決定是否真的寄信）──
+// 間隔／時段可在 ybot.html「設定」調整，不用重新排程觸發器；這裡只是頻繁檢查、
+// 依 KV 存的設定與上次寄送時間判斷「這次要不要真的寄」。
+function setupStandupWatch() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'standupWatch') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('standupWatch').timeBased().everyMinutes(15).create();
+  return '✅ 已排程每 15 分鐘檢查一次起立提醒（實際頻率依「設定」中的間隔與時段）';
+}
+
+function standupWatch() {
+  const s = getStandupSettings();
+  if (!s.enabled) return;
+  const now = new Date();
+  const hour = now.getHours();
+  if (s.startHour <= s.endHour) {
+    if (hour < s.startHour || hour >= s.endHour) return; // 不在活躍時段
+  } else {
+    if (hour < s.startHour && hour >= s.endHour) return; // 跨午夜的時段（例如 22~6）
+  }
+  const kv = readKv();
+  const last = kv.standupLastSent ? new Date(kv.standupLastSent) : null;
+  if (last && (now - last) / 60000 < s.intervalMin) return; // 還沒到下次提醒時間
+
+  // 建立一個「現在」的極短行事曆事件並設定立即彈出提醒——手機上的日曆 App（Google 日曆／
+  // 有訂閱進 Apple 日曆的話也算）會用系統原生通知鈴聲跳出提醒，不需要打開 Ybot 也會響。
+  try {
+    const end = new Date(now.getTime() + 5 * 60000);
+    const ev = CalendarApp.getDefaultCalendar().createEvent('🧍 起立走動一下', now, end,
+      { description: `每 ${s.intervalMin} 分鐘提醒一次，時段 ${s.startHour}:00~${s.endHour}:00，可在 Ybot「設定」調整或關閉。` });
+    ev.addPopupReminder(0);
+  } catch (err) { /* 忽略建立失敗 */ }
+
+  const email = NOTIFY_EMAIL || getOwnerEmail();
+  if (email) {
+    try {
+      MailApp.sendEmail(email, '🧍 起立提醒',
+        `久坐了，站起來動一動、喝口水吧！\n\n（每 ${s.intervalMin} 分鐘提醒一次，時段 ${s.startHour}:00~${s.endHour}:00，可在 Ybot「設定」調整或關閉。）`);
+    } catch (err) { /* 忽略單次寄送失敗 */ }
+  }
+  writeKv({ standupLastSent: now.toISOString() });
 }
 
 function getOwnerEmail() {
