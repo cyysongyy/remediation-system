@@ -45,6 +45,11 @@ a{color:var(--pri);}
 .chip{font-size:.76rem;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--tx2);cursor:pointer;}
 .chip:hover{border-color:var(--pri);color:var(--pri);}
 .inputRow{display:flex;gap:8px;margin-top:10px;}
+.imgPreview{display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);}
+.imgPreview img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+.imgPreview span{font-size:.8rem;color:var(--tx2);}
+.imgPreview .rmImgBtn{margin-left:auto;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:2px 6px;}
+.imgPreview .rmImgBtn:hover{color:var(--bad);}
 #chatInput{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.9rem;
   background:var(--bg);color:var(--tx);font-family:inherit;min-height:44px;max-height:120px;}
 .sendBtn{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border:none;border-radius:12px;
@@ -160,7 +165,10 @@ textarea.fi{resize:vertical;min-height:56px;}
         <span class="chip" onclick="quickAsk('幫我摘要一下未讀的重要信件')">摘要未讀信件</span>
         <span class="chip" onclick="quickAsk('幫我整理今天最該優先做的事')">今天該優先做什麼？</span>
       </div>
+      <div id="chatImagePreview" style="display:none;"></div>
       <div class="inputRow">
+        <input type="file" id="chatImageInput" accept="image/*" style="display:none;" onchange="handleChatImageSelect(event)">
+        <button class="btn ghost" id="chatImageBtn" onclick="document.getElementById('chatImageInput').click()" style="flex:0 0 auto;" title="附加圖片，讓 Ybot 看圖辨識/回答">📷</button>
         <textarea id="chatInput" class="fi" placeholder="問 Ybot 任何事…（Enter 送出，Shift+Enter 換行）" style="margin-bottom:0;"></textarea>
         <button class="sendBtn" id="sendBtn" onclick="sendChat()">送出</button>
       </div>
@@ -706,20 +714,22 @@ function aiOrder(){
   if(p==='auto'||!p)return all;
   return [p,...all.filter(x=>x!==p)].filter(id=>state.ai[id]);
 }
-async function callAI(prompt){
+async function callAI(prompt,image){
   const order=aiOrder();
   if(!order.length)throw new Error('請先在「設定」填入至少一組 AI API Key');
   let lastErr;
   for(const id of order){
-    try{return await callProvider(id,prompt);}catch(e){lastErr=e;}
+    try{return await callProvider(id,prompt,image);}catch(e){lastErr=e;}
   }
   throw lastErr||new Error('AI 呼叫失敗');
 }
-async function callProvider(id,prompt){
+async function callProvider(id,prompt,image){
   if(id==='gemini'){
+    const parts=[{text:prompt}];
+    if(image)parts.push({inline_data:{mime_type:image.mime||'image/jpeg',data:image.b64}});
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:.6,maxOutputTokens:1024}})});
+       body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.6,maxOutputTokens:1024}})});
     const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
     return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
   }
@@ -727,10 +737,37 @@ async function callProvider(id,prompt){
   const key=isNv?state.ai.nvidia:state.ai.openai;
   const model=isNv?NV_DEFAULT_MODEL:'gpt-4o-mini';
   const endpoint=isNv?NV_ENDPOINT:'https://api.openai.com/v1/chat/completions';
+  // NVIDIA 預設模型是純文字模型，附圖問答建議優先用 Gemini／OpenAI（gpt-4o-mini 支援看圖）
+  const content=image
+    ?[{type:'text',text:prompt},{type:'image_url',image_url:{url:`data:${image.mime||'image/jpeg'};base64,${image.b64}`}}]
+    :prompt;
   const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
-    body:JSON.stringify({model,messages:[{role:'user',content:prompt}],temperature:.6,max_tokens:1024})});
+    body:JSON.stringify({model,messages:[{role:'user',content}],temperature:.6,max_tokens:1024})});
   const d=await r.json();if(!r.ok)throw new Error(d.error?.message||d.detail||`${id} ${r.status}`);
   return d.choices?.[0]?.message?.content||'';
+}
+
+// ── 圖片附件（讓 Ybot 看圖回答，不存進聊天紀錄避免 localStorage 塞爆，只用於當次問答）──
+let pendingImage=null;
+function handleChatImageSelect(e){
+  const f=e.target.files[0];
+  if(!f)return;
+  if(!f.type.startsWith('image/')){alert('請選擇圖片檔');e.target.value='';return;}
+  const r=new FileReader();
+  r.onload=ev=>{
+    pendingImage={dataUrl:ev.target.result,b64:ev.target.result.split(',')[1],mime:f.type||'image/jpeg'};
+    renderChatImagePreview();
+  };
+  r.onerror=()=>alert('圖片讀取失敗');
+  r.readAsDataURL(f);
+  e.target.value='';
+}
+function removeChatImage(){pendingImage=null;renderChatImagePreview();}
+function renderChatImagePreview(){
+  const box=document.getElementById('chatImagePreview');
+  if(!pendingImage){box.style.display='none';box.innerHTML='';return;}
+  box.innerHTML=`<div class="imgPreview"><img src="${pendingImage.dataUrl}"><span>已附加圖片，送出後 Ybot 會看圖回答</span><button class="rmImgBtn" onclick="removeChatImage()">✕</button></div>`;
+  box.style.display='block';
 }
 
 // ── 對話 ────────────────────────────────
@@ -770,14 +807,17 @@ function buildContextText(){
 async function sendChat(){
   const input=document.getElementById('chatInput');
   const text=input.value.trim();
-  if(!text)return;
-  state.chat.push({role:'user',text});
+  if(!text&&!pendingImage)return;
+  const image=pendingImage;
+  pendingImage=null;renderChatImagePreview();
+  state.chat.push({role:'user',text:image?`📷 ${text||'（已附加一張圖片）'}`:text});
   input.value='';renderChat();save();
   const sendBtn=document.getElementById('sendBtn');sendBtn.disabled=true;sendBtn.textContent='思考中…';
   const history=state.chat.slice(-8).map(m=>`${m.role==='user'?'使用者':'Ybot'}：${m.text}`).join('\n');
-  const prompt=`你是 Young 的個人助理 Ybot，個性溫暖、直接、有條理。請用繁體中文回答，簡潔但完整，需要條列時再條列。\n\n以下是你目前掌握的個人資料（僅供你參考回答，不必逐項複誦）：\n${buildContextText()}\n\n對話紀錄：\n${history}\n\n請針對使用者最新的訊息回覆。`;
+  const imgNote=image?'\n\n使用者這則訊息附加了一張圖片，請先仔細看圖片內容再回答（例如辨識文字、描述內容、回答關於圖片的問題）。':'';
+  const prompt=`你是 Young 的個人助理 Ybot，個性溫暖、直接、有條理。請用繁體中文回答，簡潔但完整，需要條列時再條列。${imgNote}\n\n以下是你目前掌握的個人資料（僅供你參考回答，不必逐項複誦）：\n${buildContextText()}\n\n對話紀錄：\n${history}\n\n請針對使用者最新的訊息回覆。`;
   try{
-    const reply=await callAI(prompt);
+    const reply=await callAI(prompt,image);
     state.chat.push({role:'bot',text:reply||'（沒有取得回覆，請確認 AI 設定）'});
   }catch(e){
     state.chat.push({role:'bot',text:'⚠️ '+e.message});

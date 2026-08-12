@@ -220,17 +220,33 @@ function getGmailDigest() {
 }
 
 // 日曆彙整：未來 7 天的行程
+// 讀取「所有」看得到的日曆（含訂閱/分享加入清單的），不只主要日曆，
+// 避免副曆的行程被漏掉；同一事件若出現在多個日曆中則去重。
 function getCalendarDigest() {
   try {
     const now = new Date();
     const until = new Date(now.getTime() + 7 * 86400000);
-    const events = CalendarApp.getDefaultCalendar().getEvents(now, until);
-    return events.slice(0, 50).map(ev => ({
-      title: ev.getTitle(),
-      start: ev.getStartTime().toISOString(),
-      end: ev.getEndTime().toISOString(),
-      allDay: ev.isAllDayEvent()
-    }));
+    const calendars = CalendarApp.getAllCalendars();
+    const seen = new Set();
+    const events = [];
+    calendars.forEach(cal => {
+      try {
+        cal.getEvents(now, until).forEach(ev => {
+          const key = ev.getId() + '_' + ev.getStartTime().getTime();
+          if (seen.has(key)) return;
+          seen.add(key);
+          events.push({
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            allDay: ev.isAllDayEvent(),
+            calendar: cal.getName()
+          });
+        });
+      } catch (err) { /* 單一日曆讀取失敗就跳過，不影響其他日曆 */ }
+    });
+    events.sort((a, b) => new Date(a.start) - new Date(b.start));
+    return events.slice(0, 50);
   } catch (err) { return []; }
 }
 
