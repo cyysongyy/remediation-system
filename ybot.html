@@ -376,7 +376,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 // ── 狀態管理 ─────────────────────────────
 const LS_KEY='ybot_v1';
 function defaults(){return{
-  theme:'',fontScale:1,newsCollapsed:false,
+  theme:'',fontScale:1,newsCollapsed:false,standupCollapsed:true,
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
   gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
   standup:{enabled:false,intervalMin:60,startHour:8,endHour:18},
@@ -447,12 +447,12 @@ function fillSettings(){
   document.getElementById('standupEnd').value=state.standup.endHour;
   renderLinks();
 }
-function saveStandupSettings(){
+function applyStandupSettings(enabled,intervalMin,startHour,endHour){
   state.standup={
-    enabled:document.getElementById('standupEnabled').checked,
-    intervalMin:Math.max(15,Number(document.getElementById('standupInterval').value)||60),
-    startHour:Number(document.getElementById('standupStart').value),
-    endHour:Number(document.getElementById('standupEnd').value)
+    enabled,
+    intervalMin:Math.max(15,Number(intervalMin)||60),
+    startHour:Number(startHour),
+    endHour:Number(endHour)
   };
   if(state.context)state.context.standup=state.standup; // 立刻同步，避免總覽卡片顯示舊的雲端快照
   save();
@@ -462,7 +462,26 @@ function saveStandupSettings(){
       .then(()=>refreshContext()).catch(()=>{});
   }
   renderOverview();
+}
+function saveStandupSettings(){
+  applyStandupSettings(
+    document.getElementById('standupEnabled').checked,
+    document.getElementById('standupInterval').value,
+    document.getElementById('standupStart').value,
+    document.getElementById('standupEnd').value
+  );
   alert('已儲存起立提醒設定');
+}
+function saveStandupFromOverview(){
+  applyStandupSettings(
+    document.getElementById('ovStandupEnabled').checked,
+    document.getElementById('ovStandupInterval').value,
+    document.getElementById('ovStandupStart').value,
+    document.getElementById('ovStandupEnd').value
+  );
+  state.standupCollapsed=true; // 存檔後自動收合，首頁維持精簡
+  save();
+  renderOverview();
 }
 
 // ── 快速倒數計時（手動啟動的簡易倒數，獨立於自動起立提醒）──
@@ -887,9 +906,22 @@ function renderOverview(){
     : `<div class="ovItem ovEmpty">暫無新聞資料</div>`;
 
   const su=c.standup||state.standup;
-  const standupHtml=su&&su.enabled
-    ? `<div class="ovItem">✅ 已啟用 · 每 ${su.intervalMin} 分鐘 · ${String(su.startHour).padStart(2,'0')}:00~${String(su.endHour).padStart(2,'0')}:00</div>`
-    : `<div class="ovItem ovEmpty">尚未啟用 · <a href="javascript:void(0)" onclick="switchTab('settings')">前往設定開啟</a></div>`;
+  const standupStatus=su&&su.enabled
+    ? `✅ 已啟用 · 每 ${su.intervalMin} 分鐘 · ${String(su.startHour).padStart(2,'0')}:00~${String(su.endHour).padStart(2,'0')}:00`
+    : '⭕ 尚未啟用';
+  const standupArrow=state.standupCollapsed?'▸':'▾';
+  const standupHtml=state.standupCollapsed
+    ? `<div class="ovItem ovSub">${standupStatus}</div>`
+    : `<div class="ovItem ovSub" style="margin-bottom:8px;">${standupStatus}</div>`+
+      `<div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">`+
+      `<input type="checkbox" id="ovStandupEnabled" style="width:16px;height:16px;accent-color:var(--pri);" ${su&&su.enabled?'checked':''}>`+
+      `<label for="ovStandupEnabled" style="margin:0;font-size:.82rem;">啟用起立提醒</label></div>`+
+      `<div class="field" style="margin-bottom:8px;"><label style="display:block;font-size:.72rem;color:var(--tx2);margin-bottom:4px;">提醒間隔（分鐘）</label>`+
+      `<input type="number" id="ovStandupInterval" class="fi" min="15" max="480" step="15" value="${su?su.intervalMin:60}" style="margin-bottom:0;"></div>`+
+      `<div class="row2" style="margin-bottom:10px;">`+
+      `<select id="ovStandupStart" class="fi" style="margin-bottom:0;">${hourOptionsHtml(su?su.startHour:8)}</select>`+
+      `<select id="ovStandupEnd" class="fi" style="margin-bottom:0;">${hourOptionsHtml(su?su.endHour:18)}</select></div>`+
+      `<button class="btn" style="padding:7px 16px;font-size:.8rem;" onclick="saveStandupFromOverview()">儲存</button>`;
 
   const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
@@ -898,13 +930,22 @@ function renderOverview(){
     `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`+
-    `<div class="ovSection"><div class="ovLabel">🧍 起立提醒</div>${standupHtml}</div>`;
+    `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleStandupCollapse()">🧍 起立提醒 <span class="ovToggleIcon">${standupArrow}</span></div>${standupHtml}</div>`;
   box.style.display='block';
 }
 function toggleNewsCollapse(){
   state.newsCollapsed=!state.newsCollapsed;
   save();
   renderOverview();
+}
+function toggleStandupCollapse(){
+  state.standupCollapsed=!state.standupCollapsed;
+  save();
+  renderOverview();
+}
+function hourOptionsHtml(selected){
+  const sel=Number(selected);
+  return Array.from({length:24},(_,h)=>`<option value="${h}"${h===sel?' selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
 }
 
 // ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
