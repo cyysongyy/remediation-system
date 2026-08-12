@@ -2,48 +2,75 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ybot · 個人助理</title>
+<link rel="manifest" href="ybot-manifest.webmanifest">
+<link rel="icon" href="ybot-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="ybot-icon.svg">
+<meta name="theme-color" content="#6d28d9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ybot">
 <style>
 :root{
   --pri:#6d28d9;--pri2:#4c1d95;
   --tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;
   --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;
   --ok:#059669;--warn:#d97706;--bad:#dc2626;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:0 10px 28px rgba(15,23,42,.10),0 2px 8px rgba(15,23,42,.05);
+  --shadow-pri:0 3px 10px rgba(109,40,217,.28);
 }
 @media(prefers-color-scheme:dark){
-  :root{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;}
+  :root{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;
+    --shadow:0 1px 3px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);
+    --shadow-md:0 12px 32px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.35);}
 }
-:root[data-theme="dark"]{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;}
-:root[data-theme="light"]{--tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;--bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;}
+:root[data-theme="dark"]{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;
+  --shadow:0 1px 3px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);
+  --shadow-md:0 12px 32px rgba(0,0,0,.5),0 2px 10px rgba(0,0,0,.35);}
+:root[data-theme="light"]{--tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;--bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:0 10px 28px rgba(15,23,42,.10),0 2px 8px rgba(15,23,42,.05);}
 html{font-size:calc(clamp(0.9rem,0.78rem + 0.6vw,1.15rem) * var(--font-scale,1));}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
 a{color:var(--pri);}
+button,input,textarea{font-family:inherit;}
+button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:8px;}
 .wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 0 16px;}
-.brand{display:flex;align-items:center;gap:10px;}
-.brand .logo{font-size:1.8rem;}
-.brand h1{font-size:1.2rem;font-weight:800;}
-.brand .sub{font-size:.72rem;color:var(--tx3);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:4px 0 18px;margin-bottom:2px;border-bottom:1px solid var(--line);}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand .logo{font-size:1.35rem;width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-pri);}
+.brand h1{font-size:1.16rem;font-weight:800;letter-spacing:-.01em;}
+.brand .sub{font-size:.72rem;color:var(--tx3);margin-top:2px;}
 .theme-btn{background:var(--card);border:1px solid var(--line);color:var(--tx);width:38px;height:38px;
-  border-radius:50%;cursor:pointer;font-size:1.05rem;display:flex;align-items:center;justify-content:center;}
-.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;margin-bottom:16px;}
-.tab{flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:.86rem;font-weight:700;color:var(--tx2);cursor:pointer;user-select:none;}
-.tab.active{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;}
+  border-radius:50%;cursor:pointer;font-size:1.05rem;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s;}
+.theme-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;margin:16px 0;box-shadow:var(--shadow);}
+.tab{flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:.86rem;font-weight:700;color:var(--tx2);cursor:pointer;user-select:none;
+  transition:background-color .15s,color .15s,box-shadow .15s;}
+.tab.active{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;box-shadow:var(--shadow-pri);}
 .pane{display:none;}
 .pane.active{display:block;}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
 
 /* Chat */
-#chatBox{display:flex;flex-direction:column;gap:10px;min-height:280px;max-height:56vh;overflow-y:auto;padding:4px 2px;}
-.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.88rem;line-height:1.6;white-space:pre-wrap;}
+#chatBox{display:flex;flex-direction:column;gap:10px;min-height:280px;max-height:56vh;overflow-y:auto;padding:4px 2px;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+#chatBox::-webkit-scrollbar{width:6px;}
+#chatBox::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+.msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.88rem;line-height:1.6;white-space:pre-wrap;box-shadow:0 1px 2px rgba(15,23,42,.05);}
 .msg.bot{align-self:flex-start;background:var(--bub);color:var(--tx);border-bottom-left-radius:4px;}
-.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-bottom-right-radius:4px;}
-.msg.sys{align-self:center;color:var(--tx3);font-size:.74rem;}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border-bottom-right-radius:4px;box-shadow:var(--shadow-pri);}
+.msg.sys{align-self:center;color:var(--tx3);font-size:.74rem;box-shadow:none;background:none;padding:4px 10px;}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0;}
-.chip{font-size:.76rem;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--tx2);cursor:pointer;}
-.chip:hover{border-color:var(--pri);color:var(--pri);}
+.chip{font-size:.76rem;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--tx2);cursor:pointer;
+  transition:border-color .15s,color .15s,box-shadow .15s;}
+.chip:hover{border-color:var(--pri);color:var(--pri);box-shadow:var(--shadow);}
 .inputRow{display:flex;gap:8px;margin-top:10px;}
 .imgPreview{display:flex;align-items:center;gap:8px;margin-top:10px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);}
 .imgPreview img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;}
@@ -51,25 +78,35 @@ a{color:var(--pri);}
 .imgPreview .rmImgBtn{margin-left:auto;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:2px 6px;}
 .imgPreview .rmImgBtn:hover{color:var(--bad);}
 #chatInput{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:.9rem;
-  background:var(--bg);color:var(--tx);font-family:inherit;min-height:44px;max-height:120px;}
+  background:var(--bg);color:var(--tx);font-family:inherit;min-height:44px;max-height:120px;
+  transition:border-color .15s,box-shadow .15s;}
+#chatInput:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px rgba(109,40,217,.14);}
 .sendBtn{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border:none;border-radius:12px;
-  padding:0 18px;font-weight:800;cursor:pointer;font-size:.9rem;}
-.sendBtn:disabled{opacity:.5;cursor:default;}
+  padding:0 18px;font-weight:800;cursor:pointer;font-size:.9rem;box-shadow:var(--shadow-pri);
+  transition:transform .12s,box-shadow .12s,opacity .15s;}
+.sendBtn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(109,40,217,.34);}
+.sendBtn:disabled{opacity:.5;cursor:default;box-shadow:none;}
 .ctxbar{display:flex;align-items:center;justify-content:space-between;font-size:.72rem;color:var(--tx3);margin-bottom:8px;}
 .ctxbar button{background:none;border:none;color:var(--pri);font-weight:700;cursor:pointer;font-size:.72rem;}
 
 /* Notes */
 .typeSel{display:flex;gap:6px;margin-bottom:10px;}
-.typeSel label{flex:1;text-align:center;padding:8px 4px;border:1px solid var(--line);border-radius:10px;font-size:.8rem;cursor:pointer;color:var(--tx2);}
+.typeSel label{flex:1;text-align:center;padding:8px 4px;border:1px solid var(--line);border-radius:10px;font-size:.8rem;cursor:pointer;color:var(--tx2);
+  transition:border-color .15s,color .15s,background-color .15s;}
 .typeSel input{display:none;}
 .typeSel input:checked + span{font-weight:800;}
 .typeSel label:has(input:checked){border-color:var(--pri);color:var(--pri);background:rgba(109,40,217,.08);}
 .fi{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:.88rem;
-  background:var(--bg);color:var(--tx);font-family:inherit;margin-bottom:8px;}
+  background:var(--bg);color:var(--tx);font-family:inherit;margin-bottom:8px;transition:border-color .15s,box-shadow .15s;}
+.fi:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px rgba(109,40,217,.12);}
 textarea.fi{resize:vertical;min-height:56px;}
 .btn{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;border:none;border-radius:10px;
-  padding:9px 16px;font-weight:700;cursor:pointer;font-size:.85rem;}
-.btn.ghost{background:none;border:1px solid var(--line);color:var(--tx2);}
+  padding:9px 16px;font-weight:700;cursor:pointer;font-size:.85rem;box-shadow:var(--shadow-pri);
+  transition:transform .12s,box-shadow .12s,opacity .15s;}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(109,40,217,.34);}
+.btn:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none;}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--tx2);box-shadow:none;}
+.btn.ghost:hover:not(:disabled){border-color:var(--pri);color:var(--pri);transform:none;box-shadow:var(--shadow);}
 .filterRow{display:flex;gap:6px;margin:4px 0 12px;}
 .filterRow .chip.active{background:var(--pri);color:#fff;border-color:var(--pri);}
 .noteItem{display:flex;align-items:flex-start;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);}
@@ -84,7 +121,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 .typeTag.note{background:rgba(148,163,184,.18);color:var(--tx2);}
 .typeTag.todo{background:rgba(13,148,136,.14);color:#0d9488;}
 .typeTag.reminder{background:rgba(217,119,6,.14);color:var(--warn);}
-.delBtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:2px 6px;}
+.delBtn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:1rem;padding:2px 6px;transition:color .15s;}
 .delBtn:hover{color:var(--bad);}
 .empty{text-align:center;color:var(--tx3);font-size:.84rem;padding:28px 0;}
 
@@ -92,7 +129,10 @@ textarea.fi{resize:vertical;min-height:56px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:.8rem;font-weight:700;color:var(--tx2);margin-bottom:5px;}
 .hint{font-size:.7rem;color:var(--tx3);margin-top:4px;line-height:1.5;}
-.section-title{font-size:.86rem;font-weight:800;margin:4px 0 12px;color:var(--pri);}
+.section-title{font-size:.72rem;font-weight:800;margin:2px 0 14px;color:var(--tx2);
+  text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;}
+.section-title::before{content:'';width:3px;height:13px;border-radius:2px;flex-shrink:0;
+  background:linear-gradient(180deg,var(--pri),var(--pri2));}
 .row2{display:flex;gap:8px;}
 .row2 .fi{flex:1;}
 .statusLine{font-size:.76rem;margin-top:8px;padding:8px 10px;border-radius:8px;}
@@ -109,7 +149,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 /* Overview */
 .ovSection{margin-bottom:12px;}
 .ovSection:last-child{margin-bottom:0;}
-.ovLabel{font-size:.78rem;font-weight:800;color:var(--pri);margin-bottom:6px;}
+.ovLabel{font-size:.72rem;font-weight:800;color:var(--tx2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
 .ovItem{font-size:.84rem;line-height:1.6;padding:2px 0;}
 .ovItem a{color:var(--tx);text-decoration:none;}
 .ovItem a:hover{color:var(--pri);text-decoration:underline;}
@@ -130,7 +170,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 </head>
 <body>
 <div class="clockBox" id="clockBox"></div>
-<button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;box-shadow:0 2px 8px rgba(0,0,0,.1);" onclick="toggleTheme()">🌓</button>
+<button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;" onclick="toggleTheme()">🌓</button>
 
 <div class="wrap">
   <div class="topbar">
@@ -213,6 +253,10 @@ textarea.fi{resize:vertical;min-height:56px;}
 
   <!-- ⚙️ 設定 -->
   <div class="pane" id="pane-settings">
+    <div class="card">
+      <div class="section-title">📲 安裝到主畫面</div>
+      <div class="hint">iPhone：Safari 開啟本頁 → 分享 → 加入主畫面。之後從主畫面圖示開啟會全螢幕顯示、沒有網址列，跟原生 App 一樣。Android：Chrome 會自動跳出「安裝應用程式」提示。</div>
+    </div>
     <div class="card">
       <div class="section-title">🔤 字體大小</div>
       <div class="row2" style="align-items:center;">
@@ -832,7 +876,7 @@ function renderChatImagePreview(){
 // ── 對話 ────────────────────────────────
 function renderChat(){
   const box=document.getElementById('chatBox');
-  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot！可以問我行程、待辦、信件摘要，或任何生活上的小事。</div>';return;}
+  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot！可以問我行程、待辦、信件摘要，或任何生活上的小事。也可以直接下指令，例如「幫我加待辦：明天下午3點開會」「提醒我禮拜五交作業」，我會直接幫你新增，牽涉到日期時間的還會自動加入 Google 日曆。</div>';return;}
   box.innerHTML=state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join('');
   box.scrollTop=box.scrollHeight;
 }
@@ -863,6 +907,68 @@ function buildContextText(){
   }
   return lines.join('\n')||'（目前沒有額外資料，如需行程/信件請先在「設定」連接雲端後台）';
 }
+// ── 對話直接下指令執行（新增待辦/瑣事/提醒、建立日曆事件、標記完成、刪除）──
+// AI 判斷使用者是在下指令而非單純問答時，會在回覆文字後方附加一段
+// <<<ACTION>>>...<<<END>>> JSON，前端解析後才真的執行對應操作；
+// 顯示給使用者的訊息只保留自然語言部分，動作結果另外用一則系統訊息呈現。
+function parseChatActions(raw){
+  const m=raw.match(/<<<ACTION>>>([\s\S]*?)<<<END>>>/);
+  if(!m)return{text:raw.trim(),actions:[]};
+  const text=(raw.slice(0,m.index)+raw.slice(m.index+m[0].length)).trim();
+  let actions=[];
+  try{actions=JSON.parse(m[1].trim()).actions||[];}catch(e){/* 解析失敗就當作沒有動作，不影響正常回覆 */}
+  return{text,actions};
+}
+async function execChatActions(actions){
+  const log=[];
+  for(const a of actions){
+    try{
+      if(a.op==='add_note'){
+        const type=['note','todo','reminder'].includes(a.type)?a.type:'note';
+        const content=(a.content||'').trim();
+        if(!content)continue;
+        const dueAt=a.dueAt&&!isNaN(new Date(a.dueAt))?new Date(a.dueAt).toISOString():'';
+        const n={id:'n'+Date.now()+Math.random().toString(36).slice(2,7),type,content,dueAt,done:false,createdAt:new Date().toISOString(),notifiedAt:''};
+        state.notes.unshift(n);
+        if(state.gasUrl)fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
+        log.push(`➕ 已新增「${TYPE_LABEL[type]}」：${content}${dueAt?`（${new Date(dueAt).toLocaleString('zh-TW')}）`:''}`);
+      }else if(a.op==='add_calendar_event'&&a.start){
+        if(!state.gasUrl){log.push(`⚠️ 尚未設定雲端後台，無法建立日曆事件：${a.title||''}`);continue;}
+        const r=await fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addCalendarEvent',title:a.title||'(未命名事件)',start:a.start,end:a.end})});
+        const d=await r.json();
+        log.push(d.ok?`📅 已加入 Google 日曆：${a.title||''}（${new Date(a.start).toLocaleString('zh-TW')}）`:`⚠️ 日曆建立失敗：${d.error||'未知錯誤'}`);
+      }else if(a.op==='complete_note'&&a.match){
+        const matches=state.notes.filter(n=>!n.done&&n.content.toLowerCase().includes(String(a.match).toLowerCase()));
+        if(matches.length===1){
+          matches[0].done=true;
+          if(state.gasUrl)fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'updateNote',id:matches[0].id,patch:{done:'true'}})}).catch(()=>{});
+          log.push(`✅ 已標記完成：${matches[0].content}`);
+        }else if(!matches.length){
+          log.push(`⚠️ 找不到符合「${a.match}」的未完成項目`);
+        }else{
+          log.push(`⚠️ 「${a.match}」符合多筆項目，請到「待辦與筆記」手動勾選`);
+        }
+      }else if(a.op==='delete_note'&&a.match){
+        const matches=state.notes.filter(n=>n.content.toLowerCase().includes(String(a.match).toLowerCase()));
+        if(matches.length===1){
+          if(confirm(`要刪除「${matches[0].content}」嗎？`)){
+            state.notes=state.notes.filter(n=>n.id!==matches[0].id);
+            if(state.gasUrl)fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteNote',id:matches[0].id})}).catch(()=>{});
+            log.push(`🗑️ 已刪除：${matches[0].content}`);
+          }else{
+            log.push(`↩️ 已取消刪除：${matches[0].content}`);
+          }
+        }else if(!matches.length){
+          log.push(`⚠️ 找不到符合「${a.match}」的項目`);
+        }else{
+          log.push(`⚠️ 「${a.match}」符合多筆項目，請到「待辦與筆記」手動刪除`);
+        }
+      }
+    }catch(e){log.push(`⚠️ 執行失敗：${e.message}`);}
+  }
+  if(log.length){save();renderNotes();}
+  return log;
+}
 async function sendChat(){
   const input=document.getElementById('chatInput');
   const text=input.value.trim();
@@ -873,15 +979,31 @@ async function sendChat(){
   input.value='';renderChat();save();
   const sendBtn=document.getElementById('sendBtn');sendBtn.disabled=true;sendBtn.textContent='思考中…';
   const history=state.chat.slice(-8).map(m=>`${m.role==='user'?'使用者':'Ybot'}：${m.text}`).join('\n');
-  const imgNote=image?'\n\n使用者這則訊息附加了一張圖片，請先仔細看圖片內容再回答（例如辨識文字、描述內容、回答關於圖片的問題）。':'';
-  const prompt=`你是 Young 的個人助理 Ybot，個性溫暖、直接、有條理。請用繁體中文回答，簡潔但完整，需要條列時再條列。${imgNote}\n\n以下是你目前掌握的個人資料（僅供你參考回答，不必逐項複誦）：\n${buildContextText()}\n\n對話紀錄：\n${history}\n\n請針對使用者最新的訊息回覆。`;
+  const imgNote=image?'\n\n使用者這則訊息附加了一張圖片，請先仔細看圖片內容再回答（例如辨識文字、描述內容、回答關於圖片的問題；若圖片裡有多個待辦事項或行程，也可以一次全部整理成多個 add_note／add_calendar_event 動作）。':'';
+  const actionSpec=`\n\n如果使用者是在「下指令」要你做事（新增待辦/瑣事/提醒、把某件事加入行事曆、把某個待辦標記完成、刪除某個待辦或筆記），除了正常的自然語言回覆之外，請在回覆最後面另起一段附加動作指令，格式如下（單純問答、沒有要做事就完全不要附加這段）：
+<<<ACTION>>>
+{"actions":[
+  {"op":"add_note","type":"note|todo|reminder","content":"...","dueAt":"ISO時間或null"},
+  {"op":"add_calendar_event","title":"...","start":"ISO時間","end":"ISO時間"},
+  {"op":"complete_note","match":"用來找到該筆記的關鍵字"},
+  {"op":"delete_note","match":"用來找到該筆記的關鍵字"}
+]}
+<<<END>>>
+一次可以有多個 actions。今天日期時間是 ${new Date().toLocaleString('zh-TW')}，遇到「明天」「下週五」等相對時間請自行換算成正確日期時間。`;
+  const prompt=`你是 Young 的個人助理 Ybot，個性溫暖、直接、有條理。請用繁體中文回答，簡潔但完整，需要條列時再條列。${imgNote}${actionSpec}\n\n以下是你目前掌握的個人資料（僅供你參考回答，不必逐項複誦）：\n${buildContextText()}\n\n對話紀錄：\n${history}\n\n請針對使用者最新的訊息回覆。`;
   try{
-    const reply=await callAI(prompt,image);
-    state.chat.push({role:'bot',text:reply||'（沒有取得回覆，請確認 AI 設定）'});
+    const raw=await callAI(prompt,image);
+    const{text:replyText,actions}=parseChatActions(raw||'');
+    state.chat.push({role:'bot',text:replyText||'（沒有取得回覆，請確認 AI 設定）'});
+    save();renderChat();
+    if(actions.length){
+      const log=await execChatActions(actions);
+      if(log.length){state.chat.push({role:'sys',text:log.join('\n')});save();renderChat();}
+    }
   }catch(e){
     state.chat.push({role:'bot',text:'⚠️ '+e.message});
+    save();renderChat();
   }
-  save();renderChat();
   sendBtn.disabled=false;sendBtn.textContent='送出';
 }
 document.getElementById('chatInput').addEventListener('keydown',e=>{
