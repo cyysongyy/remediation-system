@@ -227,7 +227,7 @@ textarea.fi{resize:vertical;min-height:56px;}
           <select id="standupEnd" class="fi" style="margin-bottom:0;"></select>
         </div>
       </div>
-      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數用 Email 提醒一次，時段外不打擾。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程。</div>
+      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數提醒一次，時段外不打擾。提醒方式是在你的 Google 日曆建立一個立即彈出提醒的短事件（手機日曆 App 會用系統鈴聲通知，不用打開 Ybot），同時也會寄一封 Email。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程（會額外要求日曆的編輯權限）。</div>
       <button class="btn" onclick="saveStandupSettings()" style="margin-top:8px;">儲存</button>
     </div>
 

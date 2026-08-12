@@ -640,13 +640,24 @@ function standupWatch() {
   const kv = readKv();
   const last = kv.standupLastSent ? new Date(kv.standupLastSent) : null;
   if (last && (now - last) / 60000 < s.intervalMin) return; // 還沒到下次提醒時間
-  const email = NOTIFY_EMAIL || getOwnerEmail();
-  if (!email) return;
+
+  // 建立一個「現在」的極短行事曆事件並設定立即彈出提醒——手機上的日曆 App（Google 日曆／
+  // 有訂閱進 Apple 日曆的話也算）會用系統原生通知鈴聲跳出提醒，不需要打開 Ybot 也會響。
   try {
-    MailApp.sendEmail(email, '🧍 起立提醒',
-      `久坐了，站起來動一動、喝口水吧！\n\n（每 ${s.intervalMin} 分鐘提醒一次，時段 ${s.startHour}:00~${s.endHour}:00，可在 Ybot「設定」調整或關閉。）`);
-    writeKv({ standupLastSent: now.toISOString() });
-  } catch (err) { /* 忽略單次寄送失敗 */ }
+    const end = new Date(now.getTime() + 5 * 60000);
+    const ev = CalendarApp.getDefaultCalendar().createEvent('🧍 起立走動一下', now, end,
+      { description: `每 ${s.intervalMin} 分鐘提醒一次，時段 ${s.startHour}:00~${s.endHour}:00，可在 Ybot「設定」調整或關閉。` });
+    ev.addPopupReminder(0);
+  } catch (err) { /* 忽略建立失敗 */ }
+
+  const email = NOTIFY_EMAIL || getOwnerEmail();
+  if (email) {
+    try {
+      MailApp.sendEmail(email, '🧍 起立提醒',
+        `久坐了，站起來動一動、喝口水吧！\n\n（每 ${s.intervalMin} 分鐘提醒一次，時段 ${s.startHour}:00~${s.endHour}:00，可在 Ybot「設定」調整或關閉。）`);
+    } catch (err) { /* 忽略單次寄送失敗 */ }
+  }
+  writeKv({ standupLastSent: now.toISOString() });
 }
 
 function getOwnerEmail() {
