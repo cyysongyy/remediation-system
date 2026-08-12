@@ -154,7 +154,7 @@ function doPost(e) {
     return jsonResp({ ok: true, message: '已儲存 AI 設定' });
   }
   if (action === 'saveWeatherLocation') {
-    writeKv({ weatherCity: body.city || '' });
+    writeKv({ weatherCity: body.city || '', weatherLat: body.lat || '', weatherLon: body.lon || '' });
     CacheService.getScriptCache().remove('weatherDigest'); // 換地點後清掉舊快取，下次立刻抓新地點
     return jsonResp({ ok: true, message: '已儲存天氣地點' });
   }
@@ -236,14 +236,21 @@ function fetchNewsRss(url, limit) {
 }
 
 // 天氣彙整：來源 Open-Meteo（免金鑰）。地點預設「台北」，可在設定 → 雲端後台改地點名稱
-// （後台會用地名查經緯度）。快取 30 分鐘；地名轉經緯度另外快取 24 小時，很少變動不用常查。
+// （後台會用地名查經緯度），或前端用 GPS 直接送經緯度過來（跳過查詢，最準確）。
+// 快取 30 分鐘；地名轉經緯度另外快取 24 小時，很少變動不用常查。
 function getWeatherDigest() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get('weatherDigest');
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
 
-  const cityLabel = readKv().weatherCity || '台北';
-  const coords = geocodeCity(cityLabel);
+  const kv = readKv();
+  let coords;
+  if (kv.weatherLat && kv.weatherLon) {
+    coords = { lat: kv.weatherLat, lon: kv.weatherLon, name: '目前位置' };
+  } else {
+    const cityLabel = kv.weatherCity || '台北';
+    coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
+  }
   if (!coords) return null;
 
   let out = null;
@@ -259,7 +266,7 @@ function getWeatherDigest() {
       const daily = d.daily || {};
       const info = weatherCodeInfo(cur.weather_code);
       out = {
-        city: coords.name || cityLabel,
+        city: coords.name,
         icon: info[0], desc: info[1],
         temp: cur.temperature_2m,
         humidity: cur.relative_humidity_2m,
@@ -273,13 +280,28 @@ function getWeatherDigest() {
   if (out) { try { cache.put('weatherDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過容量就不快取 */ } }
   return out;
 }
+// Open-Meteo 地理編碼對中文城市名常常查不到（索引主要是英文/拼音），
+// 常見台灣城市先轉英文名再查，大幅提高命中率；查不到再用下面的固定座標當保底。
+const CITY_EN = {
+  '台北': 'Taipei', '臺北': 'Taipei', '新北': 'New Taipei', '桃園': 'Taoyuan',
+  '台中': 'Taichung', '臺中': 'Taichung', '台南': 'Tainan', '臺南': 'Tainan',
+  '高雄': 'Kaohsiung', '基隆': 'Keelung', '新竹': 'Hsinchu', '嘉義': 'Chiayi',
+  '宜蘭': 'Yilan', '花蓮': 'Hualien', '台東': 'Taitung', '臺東': 'Taitung',
+  '南投': 'Nantou', '雲林': 'Yunlin', '彰化': 'Changhua', '苗栗': 'Miaoli',
+  '屏東': 'Pingtung', '澎湖': 'Penghu', '金門': 'Kinmen'
+};
+const DEFAULT_WEATHER_COORDS = {
+  '台北': { lat: 25.033, lon: 121.5654, name: '台北' },
+  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' }
+};
 function geocodeCity(name) {
   const cache = CacheService.getScriptCache();
   const key = 'geo_' + name;
   const cached = cache.get(key);
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重查 */ } }
+  const query = CITY_EN[name] || name;
   try {
-    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(name);
+    const url = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(query);
     const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (res.getResponseCode() !== 200) return null;
     const d = JSON.parse(res.getContentText());
