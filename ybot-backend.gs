@@ -160,6 +160,19 @@ function doPost(e) {
     CacheService.getScriptCache().remove('weatherDigest'); // 換地點後清掉舊快取，下次立刻抓新地點
     return jsonResp({ ok: true, message: '已儲存天氣地點' });
   }
+  if (action === 'addCalendarEvent') {
+    try {
+      const title = body.title || '(未命名事件)';
+      const start = new Date(body.start);
+      if (isNaN(start.getTime())) throw new Error('無效的開始時間');
+      const end = (body.end && !isNaN(new Date(body.end).getTime())) ? new Date(body.end) : new Date(start.getTime() + 3600000);
+      const ev = CalendarApp.getDefaultCalendar().createEvent(title, start, end);
+      ev.addPopupReminder(30);
+      return jsonResp({ ok: true, message: '已加入 Google 日曆', eventId: ev.getId() });
+    } catch (err) {
+      return jsonResp({ ok: false, error: '建立日曆事件失敗：' + err.message });
+    }
+  }
   if (action === 'saveStandupSettings') {
     writeKv({
       standupEnabled: body.enabled ? 'true' : '',
