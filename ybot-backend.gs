@@ -154,7 +154,7 @@ function doPost(e) {
     return jsonResp({ ok: true, message: '已儲存 AI 設定' });
   }
   if (action === 'saveWeatherLocation') {
-    writeKv({ weatherCity: body.city || '' });
+    writeKv({ weatherCity: body.city || '', weatherLat: body.lat || '', weatherLon: body.lon || '' });
     CacheService.getScriptCache().remove('weatherDigest'); // 換地點後清掉舊快取，下次立刻抓新地點
     return jsonResp({ ok: true, message: '已儲存天氣地點' });
   }
@@ -236,14 +236,21 @@ function fetchNewsRss(url, limit) {
 }
 
 // 天氣彙整：來源 Open-Meteo（免金鑰）。地點預設「台北」，可在設定 → 雲端後台改地點名稱
-// （後台會用地名查經緯度）。快取 30 分鐘；地名轉經緯度另外快取 24 小時，很少變動不用常查。
+// （後台會用地名查經緯度），或前端用 GPS 直接送經緯度過來（跳過查詢，最準確）。
+// 快取 30 分鐘；地名轉經緯度另外快取 24 小時，很少變動不用常查。
 function getWeatherDigest() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get('weatherDigest');
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
 
-  const cityLabel = readKv().weatherCity || '台北';
-  const coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
+  const kv = readKv();
+  let coords;
+  if (kv.weatherLat && kv.weatherLon) {
+    coords = { lat: kv.weatherLat, lon: kv.weatherLon, name: '目前位置' };
+  } else {
+    const cityLabel = kv.weatherCity || '台北';
+    coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
+  }
   if (!coords) return null;
 
   let out = null;
@@ -259,7 +266,7 @@ function getWeatherDigest() {
       const daily = d.daily || {};
       const info = weatherCodeInfo(cur.weather_code);
       out = {
-        city: coords.name || cityLabel,
+        city: coords.name,
         icon: info[0], desc: info[1],
         temp: cur.temperature_2m,
         humidity: cur.relative_humidity_2m,

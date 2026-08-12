@@ -16,6 +16,7 @@
 }
 :root[data-theme="dark"]{--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--bg:#0b1220;--card:#111a2e;--line:#1e293b;--bub:#2e1a63;}
 :root[data-theme="light"]{--tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;--bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;--bub:#ede9fe;}
+html{font-size:clamp(0.9rem,0.78rem + 0.6vw,1.15rem);}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
 a{color:var(--pri);}
@@ -224,7 +225,11 @@ textarea.fi{resize:vertical;min-height:56px;}
           <input id="weatherCity" class="fi" placeholder="台北" style="margin-bottom:0;">
           <button class="btn ghost" onclick="saveWeatherCity()" style="flex:0 0 auto;">儲存地點</button>
         </div>
-        <div class="hint">城市名稱即可（例如「台北」「高雄」），用於首頁天氣與每日簡報，預設台北。</div>
+        <div class="row2" style="margin-top:6px;">
+          <button class="btn ghost" onclick="useGpsLocation()" style="flex:0 0 auto;">📍 使用目前位置</button>
+          <span id="gpsStatus" class="hint" style="margin:0;align-self:center;"></span>
+        </div>
+        <div class="hint">城市名稱即可（例如「台北」「高雄」），或按「使用目前位置」用手機/瀏覽器 GPS 自動定位（需允許定位權限）。用於首頁天氣與每日簡報，預設台北。</div>
       </div>
       <div class="hint">
         設定後可：待辦／提醒同步雲端、彙整 Gmail 未讀信與日曆行程、每日 7 點自動寄「Ybot 每日簡報」、提醒到點主動寄信。<br>
@@ -266,7 +271,7 @@ const LS_KEY='ybot_v1';
 function defaults(){return{
   theme:'',
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
-  gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',
+  gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
   links:[
     {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
     {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
@@ -304,20 +309,42 @@ function fillSettings(){
   document.getElementById('openaiKey').value=state.ai.openai;
   document.getElementById('nvidiaKey').value=state.ai.nvidia;
   document.getElementById('gasUrl').value=state.gasUrl;
-  document.getElementById('weatherCity').value=state.weatherCity;
+  document.getElementById('weatherCity').value=(state.weatherLat&&state.weatherLon)?`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`:state.weatherCity;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
   renderLinks();
 }
-function saveWeatherCity(){
-  state.weatherCity=document.getElementById('weatherCity').value.trim();
+function saveWeatherLocation(){
   save();
   if(state.gasUrl){
     fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'saveWeatherLocation',city:state.weatherCity})})
+      body:JSON.stringify({action:'saveWeatherLocation',city:state.weatherCity,lat:state.weatherLat,lon:state.weatherLon})})
       .then(()=>refreshContext()).catch(()=>{});
   }
+}
+function saveWeatherCity(){
+  state.weatherCity=document.getElementById('weatherCity').value.trim();
+  state.weatherLat='';state.weatherLon=''; // 手動輸入城市名，取消 GPS 定位模式
+  saveWeatherLocation();
   alert('已儲存天氣地點');
+}
+function useGpsLocation(){
+  const statusEl=document.getElementById('gpsStatus');
+  if(!navigator.geolocation){statusEl.textContent='❌ 此瀏覽器不支援定位';return;}
+  statusEl.textContent='定位中…';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      state.weatherLat=pos.coords.latitude.toFixed(4);
+      state.weatherLon=pos.coords.longitude.toFixed(4);
+      state.weatherCity='';
+      saveWeatherLocation();
+      document.getElementById('weatherCity').value=`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`;
+      statusEl.textContent='✅ 已使用目前位置';
+      setTimeout(()=>statusEl.textContent='',2500);
+    },
+    err=>{statusEl.textContent='❌ 取得定位失敗，請確認已允許定位權限';},
+    {timeout:10000}
+  );
 }
 function saveSettings(showToast){
   state.ai.provider=document.getElementById('aiProvider').value;
