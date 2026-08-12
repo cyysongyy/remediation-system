@@ -328,23 +328,42 @@ function saveWeatherCity(){
   saveWeatherLocation();
   alert('已儲存天氣地點');
 }
+function applyGpsPosition(pos,statusEl,silent){
+  const lat=pos.coords.latitude.toFixed(4), lon=pos.coords.longitude.toFixed(4);
+  const unchanged=state.weatherLat===lat&&state.weatherLon===lon;
+  if(unchanged&&silent)return; // 自動定位時，位置沒變就不用重存/重打後台；手動按按鈕則一定要有回饋
+  state.weatherLat=lat;state.weatherLon=lon;state.weatherCity='';
+  if(!unchanged)saveWeatherLocation(); else save();
+  const field=document.getElementById('weatherCity');
+  if(field)field.value=`📍 目前位置（${lat}, ${lon}）`;
+  if(statusEl){statusEl.textContent='✅ 已使用目前位置';setTimeout(()=>statusEl.textContent='',2500);}
+}
 function useGpsLocation(){
   const statusEl=document.getElementById('gpsStatus');
   if(!navigator.geolocation){statusEl.textContent='❌ 此瀏覽器不支援定位';return;}
   statusEl.textContent='定位中…';
   navigator.geolocation.getCurrentPosition(
-    pos=>{
-      state.weatherLat=pos.coords.latitude.toFixed(4);
-      state.weatherLon=pos.coords.longitude.toFixed(4);
-      state.weatherCity='';
-      saveWeatherLocation();
-      document.getElementById('weatherCity').value=`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`;
-      statusEl.textContent='✅ 已使用目前位置';
-      setTimeout(()=>statusEl.textContent='',2500);
-    },
+    pos=>applyGpsPosition(pos,statusEl,false),
     err=>{statusEl.textContent='❌ 取得定位失敗，請確認已允許定位權限';},
     {timeout:10000}
   );
+}
+// 自動定位：已授權過的話，每次打開 Ybot 都靜默重新定位更新天氣位置，不用再按按鈕。
+// 第一次使用瀏覽器一定會跳出權限詢問（瀏覽器安全機制，任何網站都無法繞過），
+// 同意過一次之後就不會再問，之後都是全自動、無感更新。
+function tryAutoLocate(){
+  if(!navigator.geolocation)return;
+  const hasLocation=!!(state.weatherCity||(state.weatherLat&&state.weatherLon));
+  const go=()=>navigator.geolocation.getCurrentPosition(pos=>applyGpsPosition(pos,null,true),()=>{},{timeout:8000});
+  if(navigator.permissions&&navigator.permissions.query){
+    navigator.permissions.query({name:'geolocation'}).then(status=>{
+      if(status.state==='granted')go();
+      else if(status.state==='prompt'&&!hasLocation)go(); // 第一次使用、還沒設定過地點，主動問一次
+      // status.state==='denied' 就維持現有設定或後台預設值，不再打擾
+    }).catch(()=>{ if(!hasLocation)go(); });
+  }else if(!hasLocation){
+    go();
+  }
 }
 function saveSettings(showToast){
   state.ai.provider=document.getElementById('aiProvider').value;
@@ -708,6 +727,7 @@ renderNotes();
 renderLinkChips();
 if(state.context){showCtxStatus();renderOverview();}
 if(state.gasUrl)refreshContext();
+tryAutoLocate();
 </script>
 </body>
 </html>
