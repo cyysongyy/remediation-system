@@ -204,7 +204,7 @@ function getCalendarDigest() {
     const now = new Date();
     const until = new Date(now.getTime() + 7 * 86400000);
     const events = CalendarApp.getDefaultCalendar().getEvents(now, until);
-    return events.slice(0, 20).map(ev => ({
+    return events.slice(0, 50).map(ev => ({
       title: ev.getTitle(),
       start: ev.getStartTime().toISOString(),
       end: ev.getEndTime().toISOString(),
@@ -412,7 +412,7 @@ function dailyBrief() {
   }
   if (ctx.calendar.length) {
     lines.push('📅 未來行程：');
-    ctx.calendar.slice(0, 8).forEach(ev => {
+    ctx.calendar.forEach(ev => {
       const t = ev.allDay ? '全天' : new Date(ev.start).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       lines.push(`　${t}　${ev.title}`);
     });
@@ -524,7 +524,7 @@ function aiPrioritize(items, ctx) {
     JSON.stringify(items.map(i => ({ id: i.id, content: i.content, dueAt: i.dueAt, level: i.level }))) + '\n\n' +
     `背景資訊（僅供你判斷是否要升級等級，不要新增清單外的項目、不要臆測不存在的細節）：\n` +
     `未讀信件主旨：${JSON.stringify(ctx.gmail.slice(0, 8).map(m => m.subject))}\n` +
-    `未來行程：${JSON.stringify(ctx.calendar.slice(0, 8).map(e => e.title))}\n` +
+    `未來行程：${JSON.stringify(ctx.calendar.map(e => e.title))}\n` +
     `其他系統摘要：${JSON.stringify(ctx.linked)}\n\n` +
     `請完成兩件事，只回傳一個 JSON 物件，不要有任何其他文字或說明：\n` +
     `1. upgrades：陣列，只列出你「有把握」該升級等級的項目（例如沒有到期日但內容明顯緊急），格式 [{"id":"...","level":"red"}]，沒有就給空陣列，不確定的不要動。\n` +

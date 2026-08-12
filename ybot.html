@@ -546,6 +546,9 @@ function showCtxStatus(){
   document.getElementById('ctxStatus').textContent=c?`📡 資料更新於 ${t} · 📅${(c.calendar||[]).length}行程 · 📬${(c.gmail||[]).length}未讀信`:'尚未載入雲端資料';
 }
 
+function gcalDayUrl(d){
+  return `https://calendar.google.com/calendar/r/day/${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+}
 // ── 首頁主動總覽：今日行程／重要 Email／今日新聞 ──
 function renderOverview(){
   const box=document.getElementById('overviewCard');
@@ -561,8 +564,9 @@ function renderOverview(){
   const todayEvents=(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr);
   const scheduleHtml=todayEvents.length
     ? todayEvents.map(ev=>{
-        const t=ev.allDay?'全天':new Date(ev.start).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-        return `<div class="ovItem">${esc(t)}　${esc(ev.title)}</div>`;
+        const d=new Date(ev.start);
+        const t=ev.allDay?'全天':d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+        return `<div class="ovItem"><a href="${gcalDayUrl(d)}" target="_blank" rel="noopener">${esc(t)}　${esc(ev.title)}</a></div>`;
       }).join('')
     : `<div class="ovItem ovEmpty">今天沒有排定的行程</div>`;
 
@@ -586,7 +590,7 @@ function renderOverview(){
   box.innerHTML=
     `<div class="section-title">☀️ 今日總覽</div>`+
     `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
-    `<div class="ovSection"><div class="ovLabel">📅 今日行程</div>${scheduleHtml}</div>`+
+    `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`;
   box.style.display='block';
@@ -654,7 +658,7 @@ function buildContextText(){
   const c=state.context;
   if(c){
     if(c.weather)lines.push(`今日天氣：${c.weather.city} ${c.weather.desc}，現在${c.weather.temp}°C，今日${c.weather.tMin}~${c.weather.tMax}°C，降雨機率${c.weather.rainChance??'—'}%`);
-    if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
+    if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
     if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.map(m=>`${m.important?'[重要-可能含繳費資訊] ':''}${m.subject}(來自${m.from})`).join('；'));
     if(c.news){
       const n=c.news;
