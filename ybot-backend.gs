@@ -475,6 +475,12 @@ function dailyBrief() {
     const h = ctx.linked.health;
     lines.push(`🫀 健康：最新健康分 ${h.score}，生理年齡 ${h.bio}（${h.date}）`);
   }
+  if (ctx.linked.other && Object.keys(ctx.linked.other).length) {
+    lines.push('🧩 其他串聯 App：');
+    Object.entries(ctx.linked.other).forEach(([name, text]) => {
+      lines.push(`　・${name}：${String(text).slice(0, 200)}`);
+    });
+  }
   lines.push('');
 
   if (narrative) lines.push('💬 Ybot 想跟你說：\n' + narrative + '\n');
