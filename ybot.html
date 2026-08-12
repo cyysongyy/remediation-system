@@ -271,7 +271,7 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
         <div class="section-title" style="margin:0;">🧍 起立提醒</div>
         <span style="display:flex;align-items:center;gap:6px;">
-          <input type="number" id="cdMinInput" min="1" max="999" oninput="onCdInputChange()"
+          <input type="number" id="cdMinInput" min="1" max="60" oninput="onCdInputChange(event)"
             style="width:46px;text-align:center;font-weight:800;color:var(--pri);border:1px solid var(--line);border-radius:8px;padding:4px 2px;background:var(--bg);font-size:.82rem;">
           <span id="cdDisplay" style="display:none;font-weight:800;color:var(--pri);font-size:.82rem;min-width:46px;text-align:center;"></span>
           <button type="button" id="cdStartBtn" onclick="toggleCountdown()" title="開始/暫停倒數計時"
@@ -298,7 +298,7 @@ textarea.fi{resize:vertical;min-height:56px;}
           <select id="standupEnd" class="fi" style="margin-bottom:0;"></select>
         </div>
       </div>
-      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數提醒一次，時段外不打擾。提醒方式是在你的 Google 日曆建立一個立即彈出提醒的短事件（手機日曆 App 會用系統鈴聲通知，不用打開 Ybot），同時也會寄一封 Email。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程（會額外要求日曆的編輯權限）。<br>右上角是快速倒數計時：輸入分鐘數按 ▶ 直接開始，暫停或倒數結束後，剩下（或原本設定）的時間會記住，下次打開自動帶入，不用重新輸入。</div>
+      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數提醒一次，時段外不打擾。提醒方式是在你的 Google 日曆建立一個立即彈出提醒的短事件（手機日曆 App 會用系統鈴聲通知，不用打開 Ybot），同時也會寄一封 Email。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程（會額外要求日曆的編輯權限）。<br>右上角是快速倒數計時（1~60 分鐘）：輸入分鐘數按 ▶ 直接開始，暫停或倒數結束後，剩下（或原本設定）的時間會記住，下次打開自動帶入，不用重新輸入。首頁總覽也有同一個倒數計時，兩邊會同步。</div>
       <button class="btn" onclick="saveStandupSettings()" style="margin-top:8px;">儲存</button>
     </div>
 
@@ -486,49 +486,74 @@ function saveStandupFromOverview(){
 
 // ── 快速倒數計時（手動啟動的簡易倒數，獨立於自動起立提醒）──
 // 暫停或倒數結束時，會把剩下（或原本設定）的分鐘數記住，下次開啟直接帶入，不用重新輸入。
+// 同時在「設定」與首頁總覽兩處顯示同一份倒數狀態，兩邊操作會互相同步。
+const CD_MAX_MIN=60;
+const CD_INSTANCES=[
+  {input:'cdMinInput',display:'cdDisplay',btn:'cdStartBtn'},
+  {input:'ovCdMinInput',display:'ovCdDisplay',btn:'ovCdStartBtn'}
+];
 let cdRemainingSec=0,cdTimer=null,cdRunning=false;
-function initCountdownUI(){
-  const min=Math.min(999,Math.max(1,Number(state.countdownMin)||5));
-  document.getElementById('cdMinInput').value=min;
-  cdRemainingSec=min*60;
-  renderCountdown();
+function formatMMSS(sec){
+  const m=Math.floor(sec/60).toString().padStart(2,'0');
+  const s=(sec%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+function cdClamp(min){return Math.min(CD_MAX_MIN,Math.max(1,min||1));}
+function syncCdInputs(min){
+  CD_INSTANCES.forEach(ids=>{const el=document.getElementById(ids.input);if(el)el.value=min;});
+}
+function setCdRunningUI(running){
+  CD_INSTANCES.forEach(ids=>{
+    const input=document.getElementById(ids.input),display=document.getElementById(ids.display),btn=document.getElementById(ids.btn);
+    if(btn)btn.textContent=running?'⏸':'▶';
+    if(input)input.style.display=running?'none':'';
+    if(display)display.style.display=running?'inline':'none';
+  });
 }
 function renderCountdown(){
-  const m=Math.floor(cdRemainingSec/60).toString().padStart(2,'0');
-  const s=(cdRemainingSec%60).toString().padStart(2,'0');
-  document.getElementById('cdDisplay').textContent=`${m}:${s}`;
+  const txt=formatMMSS(cdRemainingSec);
+  CD_INSTANCES.forEach(ids=>{const el=document.getElementById(ids.display);if(el)el.textContent=txt;});
 }
-function onCdInputChange(){
+// 只同步畫面顯示成目前的即時狀態，不會重設正在倒數的秒數；
+// 首頁總覽每次重繪（renderOverview）都要呼叫這個，避免正在跑的倒數被畫面重置。
+function syncCountdownDom(){
+  if(!cdRunning)syncCdInputs(cdClamp(Math.round(cdRemainingSec/60)||Number(state.countdownMin)||5));
+  renderCountdown();
+  setCdRunningUI(cdRunning);
+}
+function initCountdownUI(){
+  cdRemainingSec=cdClamp(Number(state.countdownMin)||5)*60;
+  syncCountdownDom();
+}
+function onCdInputChange(ev){
   if(cdRunning)return;
-  const input=document.getElementById('cdMinInput');
-  let min=parseInt(input.value,10);
-  if(!min||min<1)min=1;
-  if(min>999){min=999;input.value=999;}
+  const input=ev&&ev.target?ev.target:document.getElementById('cdMinInput');
+  const min=cdClamp(parseInt(input.value,10));
+  if(Number(input.value)>CD_MAX_MIN)input.value=CD_MAX_MIN;
   cdRemainingSec=min*60;
+  syncCdInputs(min);
+}
+function readCdInputMin(fallback){
+  for(const ids of CD_INSTANCES){
+    const el=document.getElementById(ids.input);
+    if(el)return cdClamp(parseInt(el.value,10)||fallback);
+  }
+  return cdClamp(fallback);
 }
 function toggleCountdown(){cdRunning?pauseCountdown():startCountdown();}
 function startCountdown(){
-  if(cdRemainingSec<=0){
-    let min=parseInt(document.getElementById('cdMinInput').value,10)||1;
-    min=Math.min(999,Math.max(1,min));
-    cdRemainingSec=min*60;
-  }
+  if(cdRemainingSec<=0)cdRemainingSec=readCdInputMin(5)*60;
   cdRunning=true;
-  document.getElementById('cdStartBtn').textContent='⏸';
-  document.getElementById('cdMinInput').style.display='none';
-  document.getElementById('cdDisplay').style.display='inline';
+  setCdRunningUI(true);
   renderCountdown();
   cdTimer=setInterval(()=>{
     cdRemainingSec--;
     renderCountdown();
     if(cdRemainingSec<=0){
       clearInterval(cdTimer);cdTimer=null;cdRunning=false;
-      document.getElementById('cdStartBtn').textContent='▶';
-      document.getElementById('cdMinInput').style.display='';
-      document.getElementById('cdDisplay').style.display='none';
+      setCdRunningUI(false);
       // 自然倒數完：下次預設值恢復成原本設定的分鐘數（不會變成 0）
-      const input=document.getElementById('cdMinInput');
-      state.countdownMin=Math.min(999,Math.max(1,parseInt(input.value,10)||5));
+      state.countdownMin=readCdInputMin(5);
       cdRemainingSec=state.countdownMin*60;
       renderCountdown();
       save();
@@ -538,25 +563,18 @@ function startCountdown(){
 }
 function pauseCountdown(){
   clearInterval(cdTimer);cdTimer=null;cdRunning=false;
-  document.getElementById('cdStartBtn').textContent='▶';
-  const leftMin=Math.min(999,Math.max(1,Math.ceil(cdRemainingSec/60)));
-  const input=document.getElementById('cdMinInput');
-  input.value=leftMin;
-  input.style.display='';
-  document.getElementById('cdDisplay').style.display='none';
+  setCdRunningUI(false);
+  const leftMin=cdClamp(Math.ceil(cdRemainingSec/60));
+  syncCdInputs(leftMin);
   // 暫停：剩下的時間變成下次預設值
   state.countdownMin=leftMin;
   save();
 }
 function resetCountdown(){
   clearInterval(cdTimer);cdTimer=null;cdRunning=false;
-  document.getElementById('cdStartBtn').textContent='▶';
-  const input=document.getElementById('cdMinInput');
-  input.style.display='';
-  document.getElementById('cdDisplay').style.display='none';
-  let min=parseInt(input.value,10)||state.countdownMin||5;
-  min=Math.min(999,Math.max(1,min));
-  input.value=min;
+  setCdRunningUI(false);
+  const min=readCdInputMin(state.countdownMin||5);
+  syncCdInputs(min);
   cdRemainingSec=min*60;
   renderCountdown();
 }
@@ -933,8 +951,18 @@ function renderOverview(){
     `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`+
-    `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleStandupCollapse()">🧍 起立提醒 <span class="ovToggleIcon">${standupArrow}</span></div>${standupHtml}</div>`;
+    `<div class="ovSection">`+
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">`+
+    `<div class="ovLabel ovLabelToggle" style="margin-bottom:0;" onclick="toggleStandupCollapse()">🧍 起立提醒 <span class="ovToggleIcon">${standupArrow}</span></div>`+
+    `<span style="display:flex;align-items:center;gap:5px;flex-shrink:0;">`+
+    `<input type="number" id="ovCdMinInput" min="1" max="60" oninput="onCdInputChange(event)" value="5" style="width:38px;text-align:center;font-weight:800;color:var(--pri);border:1px solid var(--line);border-radius:8px;padding:3px 2px;background:var(--bg);font-size:.76rem;">`+
+    `<span id="ovCdDisplay" style="display:none;font-weight:800;color:var(--pri);font-size:.76rem;min-width:38px;text-align:center;">05:00</span>`+
+    `<button type="button" id="ovCdStartBtn" onclick="toggleCountdown()" title="開始/暫停快速倒數計時" style="border:none;background:var(--pri);color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:.62rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">▶</button>`+
+    `<button type="button" onclick="resetCountdown()" title="重設倒數計時" style="border:none;background:none;color:var(--tx3);cursor:pointer;font-size:.8rem;padding:2px;flex-shrink:0;">⟲</button>`+
+    `</span></div>`+
+    `${standupHtml}</div>`;
   box.style.display='block';
+  syncCountdownDom(); // 重繪後把倒數計時的即時狀態同步回畫面，不會重設正在跑的秒數
 }
 function toggleNewsCollapse(){
   state.newsCollapsed=!state.newsCollapsed;
