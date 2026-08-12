@@ -748,7 +748,7 @@ function buildContextText(){
   const notesOnly=state.notes.filter(n=>n.type==='note');
   if(pendingTodos.length)lines.push('未完成待辦：'+pendingTodos.map(n=>n.content).join('；'));
   if(pendingReminders.length)lines.push('提醒事項：'+pendingReminders.map(n=>`${n.content}（${n.dueAt?new Date(n.dueAt).toLocaleString('zh-TW'):''}）`).join('；'));
-  if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,15).map(n=>n.content).join('；'));
+  if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,50).map(n=>n.content).join('；'));
   const knownLinks=state.links.filter(l=>l.name&&l.url);
   if(knownLinks.length)lines.push('使用者自建的其他 App：'+knownLinks.map(l=>`${l.name}(${l.url})`).join('；'));
   const c=state.context;
