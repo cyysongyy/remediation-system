@@ -193,7 +193,11 @@ textarea.fi{resize:vertical;min-height:56px;}
         <label>提醒時間</label>
         <input type="datetime-local" id="noteDue" class="fi" style="margin-bottom:0;">
       </div>
-      <button class="btn" onclick="addNote()">新增</button>
+      <div class="row2" style="margin-bottom:0;">
+        <button class="btn" onclick="addNote()" style="flex:1;">新增</button>
+        <button class="btn ghost" id="aiAddBtn" onclick="addNoteAI()" style="flex:1;">🤖 AI 智慧新增</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">🤖 AI 智慧新增：讀懂內容自動判斷是瑣事／待辦／提醒，內容若有提到具體日期時間（例如「週五下午2點開會」），會直接建立 Google 日曆事件。需先在「設定」填好 AI 金鑰與雲端後台網址。</div>
     </div>
 
     <div class="card">
@@ -570,6 +574,61 @@ function addNote(){
   renderNotes();
   if(state.gasUrl){
     fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
+  }
+}
+// AI 智慧新增：讀懂輸入內容自動判斷類型（瑣事／待辦／提醒），
+// 若內容牽涉具體日期時間，額外呼叫後台在 Google 日曆建立事件。
+async function addNoteAI(){
+  const content=document.getElementById('noteContent').value.trim();
+  if(!content){alert('請輸入內容');return;}
+  const btn=document.getElementById('aiAddBtn');
+  const origText=btn.textContent;
+  btn.disabled=true;btn.textContent='🤖 分析中…';
+  try{
+    const now=new Date();
+    const weekday=['日','一','二','三','四','五','六'][now.getDay()];
+    const prompt=`你是待辦事項分類助手。現在時間是 ${now.toLocaleString('zh-TW')}（星期${weekday}）。
+請分析以下使用者輸入的內容，判斷：
+1. type：歸類為 "note"(瑣事筆記，無時間性)、"todo"(待辦事項，需要做但沒有明確時間)、"reminder"(需要在特定時間提醒) 三者之一
+2. content：整理過的簡潔內容，保留原意
+3. dueAt：若 type 是 reminder，或內容有明確提到日期/時間，換算成 ISO 8601 本地時間字串（例如 2026-08-15T14:00:00），無法判斷則為 null
+4. calendarEvent：若內容牽涉「具體日期或時間的行程/約會/會議/活動」，給出 {"title":"事件標題","start":"ISO時間","end":"ISO時間，未提及長度則預設比start晚1小時"}；若只是單純提醒事項、無具體行程性質，則為 null
+
+使用者輸入：「${content}」
+
+只回傳 JSON，不要有其他文字或說明，格式：
+{"type":"note|todo|reminder","content":"...","dueAt":"ISO字串或null","calendarEvent":{"title":"...","start":"...","end":"..."}或null}`;
+    const raw=await callAI(prompt);
+    const m=raw.match(/\{[\s\S]*\}/);
+    if(!m)throw new Error('AI 回覆格式錯誤，請稍後再試');
+    const parsed=JSON.parse(m[0]);
+    const type=['note','todo','reminder'].includes(parsed.type)?parsed.type:'note';
+    const dueAt=parsed.dueAt&&!isNaN(new Date(parsed.dueAt))?new Date(parsed.dueAt).toISOString():'';
+    const n={id:'n'+Date.now()+Math.random().toString(36).slice(2,7),type,content:parsed.content||content,dueAt,done:false,createdAt:new Date().toISOString(),notifiedAt:''};
+    state.notes.unshift(n);save();
+    document.getElementById('noteContent').value='';
+    document.getElementById('noteDue').value='';
+    renderNotes();
+    if(state.gasUrl){
+      fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
+    }
+    let msg=`✅ 已新增為「${TYPE_LABEL[type]}」`;
+    if(parsed.calendarEvent&&parsed.calendarEvent.start&&!isNaN(new Date(parsed.calendarEvent.start))){
+      if(state.gasUrl){
+        try{
+          const r=await fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addCalendarEvent',title:parsed.calendarEvent.title||n.content,start:parsed.calendarEvent.start,end:parsed.calendarEvent.end})});
+          const d=await r.json();
+          msg+=d.ok?'，並已加入 Google 日曆':'（日曆建立失敗：'+(d.error||'未知錯誤')+'）';
+        }catch(e){msg+='（日曆建立失敗，請確認雲端後台網址）';}
+      }else{
+        msg+='（偵測到日期，但尚未設定雲端後台網址，無法加入 Google 日曆）';
+      }
+    }
+    alert(msg);
+  }catch(e){
+    alert('❌ AI 分析失敗：'+e.message+'\n可改用上方手動選類型後按「新增」。');
+  }finally{
+    btn.disabled=false;btn.textContent=origText;
   }
 }
 function toggleNote(id){
