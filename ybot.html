@@ -208,6 +208,30 @@ textarea.fi{resize:vertical;min-height:56px;}
     </div>
 
     <div class="card">
+      <div class="section-title">🧍 起立提醒</div>
+      <div class="field" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <input type="checkbox" id="standupEnabled" style="width:18px;height:18px;accent-color:var(--pri);">
+        <label for="standupEnabled" style="margin:0;">啟用起立提醒</label>
+      </div>
+      <div class="field">
+        <label>提醒間隔（分鐘）</label>
+        <input type="number" id="standupInterval" class="fi" min="15" max="480" step="15" placeholder="60" style="margin-bottom:0;">
+      </div>
+      <div class="row2" style="margin-top:10px;">
+        <div style="flex:1;">
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--tx2);margin-bottom:5px;">開始時間</label>
+          <select id="standupStart" class="fi" style="margin-bottom:0;"></select>
+        </div>
+        <div style="flex:1;">
+          <label style="display:block;font-size:.8rem;font-weight:700;color:var(--tx2);margin-bottom:5px;">結束時間</label>
+          <select id="standupEnd" class="fi" style="margin-bottom:0;"></select>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數用 Email 提醒一次，時段外不打擾。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程。</div>
+      <button class="btn" onclick="saveStandupSettings()" style="margin-top:8px;">儲存</button>
+    </div>
+
+    <div class="card">
       <div class="section-title">🤖 AI 引擎（用於對話回覆與簡報摘要）</div>
       <div class="field">
         <label>優先順序</label>
@@ -284,6 +308,7 @@ function defaults(){return{
   theme:'',fontScale:1,newsCollapsed:false,
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
   gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
+  standup:{enabled:false,intervalMin:60,startHour:8,endHour:18},
   links:[
     {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
     {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
@@ -327,6 +352,12 @@ function switchTab(name){
 }
 
 // ── 設定 ────────────────────────────────
+function populateHourSelects(){
+  const opts=Array.from({length:24},(_,h)=>`<option value="${h}">${String(h).padStart(2,'0')}:00</option>`).join('');
+  const s=document.getElementById('standupStart'), e=document.getElementById('standupEnd');
+  if(s&&!s.dataset.filled){s.innerHTML=opts;s.dataset.filled='1';}
+  if(e&&!e.dataset.filled){e.innerHTML=opts;e.dataset.filled='1';}
+}
 function fillSettings(){
   applyFontScale();
   document.getElementById('aiProvider').value=state.ai.provider;
@@ -337,7 +368,29 @@ function fillSettings(){
   document.getElementById('weatherCity').value=(state.weatherLat&&state.weatherLon)?`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`:state.weatherCity;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
+  populateHourSelects();
+  document.getElementById('standupEnabled').checked=!!state.standup.enabled;
+  document.getElementById('standupInterval').value=state.standup.intervalMin;
+  document.getElementById('standupStart').value=state.standup.startHour;
+  document.getElementById('standupEnd').value=state.standup.endHour;
   renderLinks();
+}
+function saveStandupSettings(){
+  state.standup={
+    enabled:document.getElementById('standupEnabled').checked,
+    intervalMin:Math.max(15,Number(document.getElementById('standupInterval').value)||60),
+    startHour:Number(document.getElementById('standupStart').value),
+    endHour:Number(document.getElementById('standupEnd').value)
+  };
+  if(state.context)state.context.standup=state.standup; // 立刻同步，避免總覽卡片顯示舊的雲端快照
+  save();
+  if(state.gasUrl){
+    fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveStandupSettings',enabled:state.standup.enabled,intervalMin:state.standup.intervalMin,startHour:state.standup.startHour,endHour:state.standup.endHour})})
+      .then(()=>refreshContext()).catch(()=>{});
+  }
+  renderOverview();
+  alert('已儲存起立提醒設定');
 }
 function saveWeatherLocation(){
   save();
@@ -533,7 +586,9 @@ async function refreshContext(){
       const cloudIds=new Set((d.context.notes||[]).map(n=>n.id));
       const localOnly=state.notes.filter(n=>!cloudIds.has(n.id));
       const cloudNotes=(d.context.notes||[]).map(n=>({...n,done:n.done==='true'}));
-      state.notes=[...cloudNotes,...localOnly];save();
+      state.notes=[...cloudNotes,...localOnly];
+      if(d.context.standup)state.standup=d.context.standup;
+      save();
       renderNotes();
       showCtxStatus();
       renderOverview();
@@ -586,13 +641,19 @@ function renderOverview(){
       ).join('')
     : `<div class="ovItem ovEmpty">暫無新聞資料</div>`;
 
+  const su=c.standup||state.standup;
+  const standupHtml=su&&su.enabled
+    ? `<div class="ovItem">✅ 已啟用 · 每 ${su.intervalMin} 分鐘 · ${String(su.startHour).padStart(2,'0')}:00~${String(su.endHour).padStart(2,'0')}:00</div>`
+    : `<div class="ovItem ovEmpty">尚未啟用 · <a href="javascript:void(0)" onclick="switchTab('settings')">前往設定開啟</a></div>`;
+
   const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
     `<div class="section-title">☀️ 今日總覽</div>`+
     `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
-    `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`;
+    `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`+
+    `<div class="ovSection"><div class="ovLabel">🧍 起立提醒</div>${standupHtml}</div>`;
   box.style.display='block';
 }
 function toggleNewsCollapse(){
