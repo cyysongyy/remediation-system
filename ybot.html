@@ -177,6 +177,10 @@ textarea.fi{resize:vertical;min-height:56px;}
         <label><input type="radio" name="ntype" value="reminder"><span>⏰ 定時提醒</span></label>
       </div>
       <textarea id="noteContent" class="fi" placeholder="寫下內容…"></textarea>
+      <div class="row2" style="margin-bottom:10px;">
+        <button class="btn ghost" id="voiceBtn" onclick="toggleVoiceInput()" style="flex:0 0 auto;display:none;">🎤 語音輸入</button>
+        <span id="voiceStatus" class="hint" style="margin:0;align-self:center;"></span>
+      </div>
       <div class="field" id="dueField" style="display:none;">
         <label>提醒時間</label>
         <input type="datetime-local" id="noteDue" class="fi" style="margin-bottom:0;">
@@ -508,6 +512,37 @@ function clearLocal(){
 document.querySelectorAll('input[name=ntype]').forEach(r=>r.addEventListener('change',()=>{
   document.getElementById('dueField').style.display=r.value==='reminder'&&r.checked?'block':'none';
 }));
+
+// ── 語音輸入（瀏覽器內建 Web Speech API，Chrome/Edge 支援較好；
+// iPhone Safari 不支援這個 API，此時按鈕會自動隱藏，但 iOS 鍵盤本身內建的
+// 麥克風聽寫功能仍可直接在下方文字框使用，效果一樣，不需要這個按鈕）──
+const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
+let voiceRecognition=null,voiceListening=false;
+function initVoiceButton(){
+  const btn=document.getElementById('voiceBtn');
+  if(!btn)return;
+  btn.style.display=SpeechRec?'inline-flex':'none';
+}
+function toggleVoiceInput(){
+  if(!SpeechRec)return;
+  const btn=document.getElementById('voiceBtn');
+  const status=document.getElementById('voiceStatus');
+  if(voiceListening){voiceRecognition&&voiceRecognition.stop();return;}
+  voiceRecognition=new SpeechRec();
+  voiceRecognition.lang='zh-TW';
+  voiceRecognition.interimResults=false;
+  voiceRecognition.continuous=false;
+  voiceRecognition.onstart=()=>{voiceListening=true;btn.textContent='🔴 錄音中…（再按一次停止）';status.textContent='';};
+  voiceRecognition.onresult=(e)=>{
+    const text=e.results[0][0].transcript;
+    const ta=document.getElementById('noteContent');
+    ta.value=(ta.value?ta.value+' ':'')+text;
+  };
+  voiceRecognition.onerror=(e)=>{status.textContent='❌ 語音辨識失敗：'+(e.error||'未知錯誤');};
+  voiceRecognition.onend=()=>{voiceListening=false;btn.textContent='🎤 語音輸入';};
+  try{voiceRecognition.start();}catch(err){status.textContent='❌ 無法啟動語音輸入';}
+}
+initVoiceButton();
 let noteFilter='all';
 function setFilter(f){
   noteFilter=f;
