@@ -174,22 +174,27 @@ function buildContext() {
   };
 }
 
-// Gmail 彙整：近 2 天未讀信件，僅取主旨／寄件者／時間／摘要片段（不含全文）
+// Gmail 彙整：近 2 天未讀信件，僅取主旨／寄件者／時間／摘要片段（不含全文）。
+// 排除 Ybot 自己寄的信（避免自己的每日簡報/提醒被當成「未讀重要信件」形成迴圈）
+// 與 Google 安全性快訊；含信用卡/繳費關鍵字的標記為重要並優先顯示；最多列 2 封。
+const GMAIL_IMPORTANT_KEYWORDS = ['信用卡', '繳費', '帳單', '付款', '逾期', 'invoice', 'payment', 'credit card'];
 function getGmailDigest() {
   try {
-    const threads = GmailApp.search('is:unread newer_than:2d', 0, 15);
-    const out = [];
-    threads.forEach(t => {
+    const threads = GmailApp.search('is:unread newer_than:2d -from:me -from:no-reply@accounts.google.com', 0, 20);
+    const out = threads.map(t => {
       const msgs = t.getMessages();
       const last = msgs[msgs.length - 1];
-      out.push({
-        subject: t.getFirstMessageSubject(),
-        from: last.getFrom(),
-        date: last.getDate().toISOString(),
-        snippet: (last.getPlainBody() || '').slice(0, 120).replace(/\s+/g, ' ')
-      });
+      const subject = t.getFirstMessageSubject() || '';
+      const body = (last.getPlainBody() || '').replace(/\s+/g, ' ');
+      const hay = (subject + ' ' + body).toLowerCase();
+      const important = GMAIL_IMPORTANT_KEYWORDS.some(k => hay.includes(k.toLowerCase()));
+      return {
+        subject, from: last.getFrom(), date: last.getDate().toISOString(),
+        snippet: body.slice(0, 120), important
+      };
     });
-    return out;
+    out.sort((a, b) => (b.important - a.important) || (new Date(b.date) - new Date(a.date)));
+    return out.slice(0, 2);
   } catch (err) { return []; }
 }
 
@@ -430,8 +435,8 @@ function dailyBrief() {
     lines.push('');
   }
   if (ctx.gmail.length) {
-    lines.push(`📬 未讀重要信件（近 2 天，共 ${ctx.gmail.length} 封）：`);
-    ctx.gmail.slice(0, 5).forEach(m => lines.push(`　・${m.subject}（${m.from}）`));
+    lines.push(`📬 未讀重要信件（${ctx.gmail.length} 封）：`);
+    ctx.gmail.forEach(m => lines.push(`　${m.important ? '💳' : '・'} ${m.subject}（${m.from}）`));
     lines.push('');
   }
   const news = ctx.news || {};

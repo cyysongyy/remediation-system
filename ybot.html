@@ -544,9 +544,9 @@ function renderOverview(){
       }).join('')
     : `<div class="ovItem ovEmpty">今天沒有排定的行程</div>`;
 
-  const mails=(c.gmail||[]).slice(0,3);
+  const mails=c.gmail||[];
   const mailHtml=mails.length
-    ? mails.map(m=>`<div class="ovItem">${esc(m.subject)} <span class="ovSub">（${esc(m.from)}）</span></div>`).join('')
+    ? mails.map(m=>`<div class="ovItem">${m.important?'💳 ':''}${esc(m.subject)} <span class="ovSub">（${esc(m.from)}）</span></div>`).join('')
     : `<div class="ovItem ovEmpty">沒有未讀的重要信件</div>`;
 
   const news=c.news||{};
@@ -627,7 +627,7 @@ function buildContextText(){
   if(c){
     if(c.weather)lines.push(`今日天氣：${c.weather.city} ${c.weather.desc}，現在${c.weather.temp}°C，今日${c.weather.tMin}~${c.weather.tMax}°C，降雨機率${c.weather.rainChance??'—'}%`);
     if((c.calendar||[]).length)lines.push('未來行程：'+c.calendar.slice(0,10).map(ev=>`${ev.title}(${new Date(ev.start).toLocaleString('zh-TW')})`).join('；'));
-    if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.slice(0,8).map(m=>`${m.subject}(來自${m.from})`).join('；'));
+    if((c.gmail||[]).length)lines.push('未讀重要信件：'+c.gmail.map(m=>`${m.important?'[重要-可能含繳費資訊] ':''}${m.subject}(來自${m.from})`).join('；'));
     if(c.news){
       const n=c.news;
       const newsFlat=[...(n.domestic||[]),...(n.world||[]),...(n.education||[])];
