@@ -233,12 +233,6 @@ textarea.fi{resize:vertical;min-height:56px;}
       </div>
       <div class="linkChips" id="linkChips"></div>
       <div id="chatBox"></div>
-      <div class="chips" id="chatChips">
-        <span class="chip" onclick="quickAsk('今天有什麼行程？')">今天有什麼行程？</span>
-        <span class="chip" onclick="quickAsk('我還有哪些待辦沒完成？')">還有哪些待辦？</span>
-        <span class="chip" onclick="quickAsk('幫我摘要一下未讀的重要信件')">摘要未讀信件</span>
-        <span class="chip" onclick="quickAsk('幫我整理今天最該優先做的事')">今天該優先做什麼？</span>
-      </div>
       <div id="chatImagePreview" style="display:none;"></div>
       <div class="inputRow">
         <input type="file" id="chatImageInput" accept="image/*" style="display:none;" onchange="handleChatImageSelect(event)">
@@ -1096,7 +1090,7 @@ function renderChatImagePreview(){
 // ── 對話 ────────────────────────────────
 function renderChat(){
   const box=document.getElementById('chatBox');
-  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot，有什麼可以幫你？</div>';return;}
+  if(!state.chat.length){box.innerHTML='';return;}
   box.innerHTML=state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join('');
   box.scrollTop=box.scrollHeight;
 }
