@@ -48,8 +48,12 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroDeco{position:absolute;width:56px;height:56px;border:1px solid rgba(148,163,184,.3);pointer-events:none;}
 .heroDeco.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;border-radius:20px 0 0 0;}
 .heroDeco.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;border-radius:0 20px 0 0;}
-.heroTop{display:flex;justify-content:flex-end;padding-right:44px;}
-.heroClock{font-size:.68rem;color:#cbd5e1;text-align:right;line-height:1.4;user-select:none;}
+.heroTop{display:flex;justify-content:space-between;align-items:flex-start;padding-right:44px;gap:10px;}
+.heroWeatherMini{display:flex;align-items:center;gap:5px;font-size:.78rem;color:#e2e8f0;flex-shrink:0;}
+.heroWeatherMini .icon{font-size:1.15rem;line-height:1;}
+.heroWeatherMini .t{font-weight:800;font-size:.95rem;color:#fff;}
+.heroWeatherMini .d{color:#94a3b8;font-size:.68rem;}
+.heroClock{font-size:.68rem;color:#cbd5e1;text-align:right;line-height:1.4;user-select:none;flex-shrink:0;}
 .heroClock .clockTime{font-weight:700;color:#fff;}
 .heroClock .clockLunar{color:#94a3b8;}
 .heroTagline{font-size:.6rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;margin-top:14px;text-transform:uppercase;}
@@ -68,9 +72,11 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroOrbDot.d2{top:18%;right:-1.5px;}
 .heroOrbDot.d3{bottom:12%;left:-1.5px;}
 .heroOrbCore{position:absolute;inset:15px;border-radius:50%;
-  background:radial-gradient(circle at 35% 28%,#f3e8ff,#c4b5fd 45%,#7c3aed 85%);
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.25rem;
-  box-shadow:0 0 20px rgba(167,139,250,.85),0 0 37px rgba(139,92,246,.42),inset 0 0 9px rgba(255,255,255,.4);
+  background:radial-gradient(circle at 50% 50%,rgba(139,92,246,.18),rgba(10,14,31,.7) 72%);
+  border:1.5px solid rgba(233,213,255,.9);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.56rem;letter-spacing:-.01em;
+  box-shadow:0 0 16px rgba(196,181,253,.85),0 0 32px rgba(139,92,246,.45),inset 0 0 10px rgba(196,181,253,.3);
+  text-shadow:0 0 8px rgba(196,181,253,.95),0 0 16px rgba(139,92,246,.6);
   animation:heroPulse 3s ease-in-out infinite;}
 .heroOrbBeam{width:9px;height:19px;margin-top:-2px;
   background:linear-gradient(180deg,rgba(196,181,253,.55),rgba(196,181,253,0));filter:blur(.5px);}
@@ -243,7 +249,10 @@ textarea.fi{resize:vertical;min-height:56px;}
   <div class="hero">
     <div class="heroDeco tl"></div>
     <div class="heroDeco tr"></div>
-    <div class="heroTop"><div class="heroClock" id="clockBox"></div></div>
+    <div class="heroTop">
+      <div class="heroWeatherMini" id="heroWeatherMini"></div>
+      <div class="heroClock" id="clockBox"></div>
+    </div>
     <div class="heroOrbGroup">
       <div class="heroOrbWrap">
         <div class="heroOrbRing outer"></div>
@@ -251,7 +260,7 @@ textarea.fi{resize:vertical;min-height:56px;}
         <span class="heroOrbDot d1"></span>
         <span class="heroOrbDot d2"></span>
         <span class="heroOrbDot d3"></span>
-        <div class="heroOrbCore">Y</div>
+        <div class="heroOrbCore">Ybot</div>
       </div>
       <div class="heroOrbBeam"></div>
       <div class="heroOrbBase"></div>
@@ -965,9 +974,17 @@ function gcalDayUrl(d){
   return `https://calendar.google.com/calendar/r/day/${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
 }
 // ── 首頁主動總覽：今日行程／重要 Email／今日新聞 ──
+function renderHeroWeather(w){
+  const el=document.getElementById('heroWeatherMini');
+  if(!el)return;
+  el.innerHTML=w
+    ? `<span class="icon">${esc(w.icon||'🌡️')}</span><span class="t">${w.temp}°</span><span class="d">${esc(w.desc||'')}</span>`
+    : '';
+}
 function renderOverview(){
   const box=document.getElementById('overviewCard');
   const c=state.context;
+  renderHeroWeather(c&&c.weather);
   if(!c){box.style.display='none';box.innerHTML='';return;}
 
   const w=c.weather;
@@ -1316,7 +1333,7 @@ function updateClock(){
   const now=new Date();
   const dateStr=`${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const l=solar2lunar(now.getFullYear(),now.getMonth()+1,now.getDate());
-  const lunarStr=l?`農曆${l.isLeap?'閏':''}${l.lDay===1?CN_MONTH[l.lMonth-1]:CN_DAY[l.lDay-1]}`:'';
+  const lunarStr=l?`農曆${l.isLeap?'閏':''}${CN_MONTH[l.lMonth-1]}${CN_DAY[l.lDay-1]}`:'';
   document.getElementById('clockBox').innerHTML=
     `<div class="clockTime">${dateStr}</div>`+(lunarStr?`<div class="clockLunar">${lunarStr}</div>`:'');
 }
