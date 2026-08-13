@@ -977,12 +977,13 @@ function renderHeroSchedule(events){
     el.innerHTML=`<a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener">今天沒有行程 ↗</a>`;
     return;
   }
-  const items=events.slice(0,2).map(ev=>{
+  const LIMIT=4;
+  const items=events.slice(0,LIMIT).map(ev=>{
     const d=new Date(ev.start);
     const t=ev.allDay?'全天':d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
     return `<a href="${gcalDayUrl(d)}" target="_blank" rel="noopener"><span class="t">${esc(t)}</span>${esc(ev.title)}</a>`;
   }).join('');
-  const more=events.length>2?`<a class="more" href="https://calendar.google.com/calendar/" target="_blank" rel="noopener">+${events.length-2} 項 ↗</a>`:'';
+  const more=events.length>LIMIT?`<a class="more" href="https://calendar.google.com/calendar/" target="_blank" rel="noopener">+${events.length-LIMIT} 項 ↗</a>`:'';
   el.innerHTML=items+more;
 }
 function renderOverview(){
