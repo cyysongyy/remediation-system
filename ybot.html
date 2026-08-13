@@ -295,7 +295,7 @@ textarea.fi{resize:vertical;min-height:56px;}
       </div>
       <textarea id="noteContent" class="fi" placeholder="寫下內容…"></textarea>
       <div class="row2" style="margin-bottom:10px;">
-        <button class="btn ghost" id="voiceBtn" onclick="toggleVoiceInput()" style="flex:0 0 auto;display:none;">🎤 語音輸入</button>
+        <button class="btn ghost" id="voiceBtn" onclick="toggleRecording()" style="flex:0 0 auto;display:none;">🎙️ 錄音</button>
         <span id="voiceStatus" class="hint" style="margin:0;align-self:center;"></span>
       </div>
       <div class="field" id="dueField" style="display:none;">
@@ -777,34 +777,82 @@ document.querySelectorAll('input[name=ntype]').forEach(r=>r.addEventListener('ch
   document.getElementById('dueField').style.display=r.value==='reminder'&&r.checked?'block':'none';
 }));
 
-// ── 語音輸入（瀏覽器內建 Web Speech API，Chrome/Edge 支援較好；
-// iPhone Safari 不支援這個 API，此時按鈕會自動隱藏，但 iOS 鍵盤本身內建的
-// 麥克風聽寫功能仍可直接在下方文字框使用，效果一樣，不需要這個按鈕）──
-const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
-let voiceRecognition=null,voiceListening=false;
+// ── 錄音轉文字（MediaRecorder 錄音 → AI 轉文字稿 → 填入筆記內容框）──
+const REC_MIME=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))||'';
+let mediaRecorder=null,recChunks=[],recording=false;
 function initVoiceButton(){
   const btn=document.getElementById('voiceBtn');
   if(!btn)return;
-  btn.style.display=SpeechRec?'inline-flex':'none';
+  btn.style.display=(navigator.mediaDevices&&window.MediaRecorder)?'inline-flex':'none';
 }
-function toggleVoiceInput(){
-  if(!SpeechRec)return;
+async function toggleRecording(){
   const btn=document.getElementById('voiceBtn');
   const status=document.getElementById('voiceStatus');
-  if(voiceListening){voiceRecognition&&voiceRecognition.stop();return;}
-  voiceRecognition=new SpeechRec();
-  voiceRecognition.lang='zh-TW';
-  voiceRecognition.interimResults=false;
-  voiceRecognition.continuous=false;
-  voiceRecognition.onstart=()=>{voiceListening=true;btn.textContent='🔴 錄音中…（再按一次停止）';status.textContent='';};
-  voiceRecognition.onresult=(e)=>{
-    const text=e.results[0][0].transcript;
-    const ta=document.getElementById('noteContent');
-    ta.value=(ta.value?ta.value+' ':'')+text;
-  };
-  voiceRecognition.onerror=(e)=>{status.textContent='❌ 語音辨識失敗：'+(e.error||'未知錯誤');};
-  voiceRecognition.onend=()=>{voiceListening=false;btn.textContent='🎤 語音輸入';};
-  try{voiceRecognition.start();}catch(err){status.textContent='❌ 無法啟動語音輸入';}
+  if(recording){mediaRecorder&&mediaRecorder.stop();return;}
+  if(!(state.ai.gemini||state.ai.openai)){status.textContent='❌ 請先在「設定」填入 Gemini 或 OpenAI API Key';return;}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recChunks=[];
+    mediaRecorder=REC_MIME?new MediaRecorder(stream,{mimeType:REC_MIME}):new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data);};
+    mediaRecorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      recording=false;btn.textContent='🎙️ 錄音';
+      const blob=new Blob(recChunks,{type:mediaRecorder.mimeType||REC_MIME||'audio/mp4'});
+      status.textContent='⏳ 轉換文字稿中…';
+      try{
+        const text=await transcribeAudio(blob,mediaRecorder.mimeType||REC_MIME||'audio/mp4');
+        if(text){
+          const ta=document.getElementById('noteContent');
+          ta.value=(ta.value?ta.value+' ':'')+text;
+        }
+        status.textContent=text?'✅ 已轉成文字稿':'⚠️ 沒有辨識到內容';
+      }catch(err){status.textContent='❌ 轉文字失敗：'+err.message;}
+    };
+    mediaRecorder.start();
+    recording=true;btn.textContent='🔴 錄音中…（再按一次停止）';status.textContent='';
+  }catch(err){status.textContent='❌ 無法取得麥克風權限';}
+}
+async function transcribeAudio(blob,mime){
+  const order=aiOrder().filter(id=>id!=='nvidia');
+  if(!order.length)throw new Error('請先設定 Gemini 或 OpenAI API Key');
+  let lastErr;
+  for(const id of order){
+    try{
+      if(id==='gemini')return await transcribeWithGemini(blob,mime);
+      if(id==='openai')return await transcribeWithOpenAI(blob,mime);
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('語音轉文字失敗');
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+async function transcribeWithGemini(blob,mime){
+  const b64=await blobToBase64(blob);
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({contents:[{parts:[
+       {text:'請將這段語音逐字轉成繁體中文文字稿，只輸出文字稿內容本身，不要加任何說明、標題或引號。'},
+       {inline_data:{mime_type:mime.split(';')[0],data:b64}}
+     ]}],generationConfig:{temperature:.2,maxOutputTokens:1024}})});
+  const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
+  return (d.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+}
+async function transcribeWithOpenAI(blob,mime){
+  const fd=new FormData();
+  const ext=mime.includes('mp4')?'mp4':mime.includes('webm')?'webm':'m4a';
+  fd.append('file',blob,`rec.${ext}`);
+  fd.append('model','whisper-1');
+  const r=await fetch('https://api.openai.com/v1/audio/transcriptions',
+    {method:'POST',headers:{'Authorization':`Bearer ${state.ai.openai}`},body:fd});
+  const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`OpenAI ${r.status}`);
+  return (d.text||'').trim();
 }
 initVoiceButton();
 let noteFilter='all';
