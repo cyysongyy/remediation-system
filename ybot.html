@@ -59,8 +59,9 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
 
 /* Chat */
-#chatBox{display:flex;flex-direction:column;gap:10px;min-height:280px;max-height:56vh;overflow-y:auto;padding:4px 2px;
+#chatBox{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow-y:auto;padding:4px 2px;
   scrollbar-width:thin;scrollbar-color:var(--line) transparent;}
+#chatBox:empty{padding:0;}
 #chatBox::-webkit-scrollbar{width:6px;}
 #chatBox::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
 .msg{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.88rem;line-height:1.6;white-space:pre-wrap;box-shadow:0 1px 2px rgba(15,23,42,.05);}
