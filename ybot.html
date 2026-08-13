@@ -52,37 +52,33 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroClock{font-size:.68rem;color:#cbd5e1;text-align:right;line-height:1.4;user-select:none;}
 .heroClock .clockTime{font-weight:700;color:#fff;}
 .heroClock .clockLunar{color:#94a3b8;}
-.heroWordmark{font-size:2.3rem;font-weight:900;letter-spacing:-.02em;margin-top:8px;
-  background:linear-gradient(135deg,#ffffff,#c4b5fd 60%,#8b5cf6);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  filter:drop-shadow(0 0 16px rgba(139,92,246,.45));line-height:1;}
-.heroTagline{font-size:.58rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;margin-top:6px;text-transform:uppercase;}
-.heroSub{font-size:.86rem;color:#e2e8f0;margin-top:12px;font-weight:600;}
+.heroTagline{font-size:.6rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;margin-top:14px;text-transform:uppercase;}
+.heroSub{font-size:.86rem;color:#e2e8f0;margin-top:10px;font-weight:600;}
 .heroSub a{color:#c4b5fd;font-weight:700;}
 .heroFeatures{font-size:.7rem;color:#a5b4fc;margin-top:4px;}
 
-/* 中央全息投影風格 Logo：外圈軌道＋粒子點＋發光核心＋投影光束與底座光暈 */
-.heroOrbGroup{display:flex;flex-direction:column;align-items:center;margin-top:22px;}
-.heroOrbWrap{position:relative;width:128px;height:128px;flex-shrink:0;}
+/* 全息投影風格 Logo：外圈軌道＋粒子點＋發光核心＋投影光束與底座光暈，取代文字 Logo，置於左上角 */
+.heroOrbGroup{display:flex;flex-direction:column;align-items:center;width:fit-content;margin-top:6px;}
+.heroOrbWrap{position:relative;width:150px;height:150px;flex-shrink:0;}
 .heroOrbRing{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(167,139,250,.28);}
 .heroOrbRing.outer{animation:heroSpin 34s linear infinite;}
-.heroOrbRing.mid{inset:16px;border-style:dashed;border-color:rgba(167,139,250,.32);animation:heroSpin 22s linear infinite reverse;}
-.heroOrbDot{position:absolute;width:5px;height:5px;border-radius:50%;background:#c4b5fd;box-shadow:0 0 8px #c4b5fd,0 0 2px #fff;}
-.heroOrbDot.d1{top:-2px;left:50%;margin-left:-2.5px;}
+.heroOrbRing.mid{inset:19px;border-style:dashed;border-color:rgba(167,139,250,.32);animation:heroSpin 22s linear infinite reverse;}
+.heroOrbDot{position:absolute;width:6px;height:6px;border-radius:50%;background:#c4b5fd;box-shadow:0 0 9px #c4b5fd,0 0 2px #fff;}
+.heroOrbDot.d1{top:-3px;left:50%;margin-left:-3px;}
 .heroOrbDot.d2{top:18%;right:-3px;}
 .heroOrbDot.d3{bottom:12%;left:-3px;}
-.heroOrbCore{position:absolute;inset:26px;border-radius:50%;
+.heroOrbCore{position:absolute;inset:30px;border-radius:50%;
   background:radial-gradient(circle at 35% 28%,#f3e8ff,#c4b5fd 45%,#7c3aed 85%);
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:2.1rem;
-  box-shadow:0 0 34px rgba(167,139,250,.8),0 0 64px rgba(139,92,246,.4),inset 0 0 16px rgba(255,255,255,.4);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:2.5rem;
+  box-shadow:0 0 40px rgba(167,139,250,.85),0 0 74px rgba(139,92,246,.42),inset 0 0 18px rgba(255,255,255,.4);
   animation:heroPulse 3s ease-in-out infinite;}
-.heroOrbBeam{width:16px;height:34px;margin-top:-4px;
+.heroOrbBeam{width:18px;height:38px;margin-top:-4px;
   background:linear-gradient(180deg,rgba(196,181,253,.55),rgba(196,181,253,0));filter:blur(.5px);}
-.heroOrbBase{position:relative;width:128px;height:26px;margin-top:-4px;border-radius:50%;
+.heroOrbBase{position:relative;width:150px;height:30px;margin-top:-4px;border-radius:50%;
   background:radial-gradient(ellipse at center,rgba(167,139,250,.42),rgba(167,139,250,.1) 55%,transparent 75%);}
 .heroOrbBase::before,.heroOrbBase::after{content:'';position:absolute;border-radius:50%;border:1px solid rgba(167,139,250,.22);}
-.heroOrbBase::before{inset:-7px 20px;}
-.heroOrbBase::after{inset:-14px 34px;border-color:rgba(167,139,250,.13);}
+.heroOrbBase::before{inset:-8px 23px;}
+.heroOrbBase::after{inset:-16px 40px;border-color:rgba(167,139,250,.13);}
 @keyframes heroPulse{
   0%,100%{box-shadow:0 0 34px rgba(167,139,250,.8),0 0 64px rgba(139,92,246,.4),inset 0 0 16px rgba(255,255,255,.4);}
   50%{box-shadow:0 0 48px rgba(167,139,250,1),0 0 84px rgba(139,92,246,.55),inset 0 0 20px rgba(255,255,255,.5);}
@@ -248,10 +244,6 @@ textarea.fi{resize:vertical;min-height:56px;}
     <div class="heroDeco tl"></div>
     <div class="heroDeco tr"></div>
     <div class="heroTop"><div class="heroClock" id="clockBox"></div></div>
-    <div class="heroWordmark">Ybot</div>
-    <div class="heroTagline">Your Personal AI Assistant</div>
-    <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
-    <div class="heroFeatures">整合行程．智能提醒．高效生活</div>
     <div class="heroOrbGroup">
       <div class="heroOrbWrap">
         <div class="heroOrbRing outer"></div>
@@ -264,6 +256,9 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div class="heroOrbBeam"></div>
       <div class="heroOrbBase"></div>
     </div>
+    <div class="heroTagline">Your Personal AI Assistant</div>
+    <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
+    <div class="heroFeatures">整合行程．智能提醒．高效生活</div>
   </div>
 
   <div class="tabs">
