@@ -293,7 +293,7 @@ textarea.fi{resize:vertical;min-height:56px;}
   <div class="pane" id="pane-settings">
     <div class="card">
       <div class="section-title">📲 安裝到主畫面</div>
-      <div class="hint">iPhone：Safari 開啟本頁 → 分享 → 加入主畫面。之後從主畫面圖示開啟會全螢幕顯示、沒有網址列，跟原生 App 一樣。Android：Chrome 會自動跳出「安裝應用程式」提示。</div>
+      <div class="hint">iPhone：分享 → 加入主畫面｜Android：Chrome 會自動提示安裝</div>
     </div>
     <div class="card">
       <div class="section-title">🔤 字體大小</div>
@@ -302,7 +302,7 @@ textarea.fi{resize:vertical;min-height:56px;}
         <span id="fontScaleLabel" style="flex:1;text-align:center;font-weight:800;color:var(--pri);">100%</span>
         <button class="btn ghost" onclick="adjustFontScale(0.1)" style="flex:0 0 auto;">＋</button>
       </div>
-      <div class="hint">在畫面本身會隨螢幕寬度自動縮放的基礎上，額外微調文字大小（80%~200%），會記住設定。</div>
+      <div class="hint">80%~200%，會記住設定</div>
     </div>
 
     <div class="card">
@@ -325,7 +325,7 @@ textarea.fi{resize:vertical;min-height:56px;}
           <select id="standupEnd" class="fi" style="margin-bottom:0;"></select>
         </div>
       </div>
-      <div class="hint" style="margin-top:8px;">只在設定的時段內、每隔固定分鐘數提醒一次，時段外不打擾。提醒方式是在你的 Google 日曆建立一個立即彈出提醒的短事件（手機日曆 App 會用系統鈴聲通知，不用打開 Ybot），同時也會寄一封 Email。首次使用需在 Apps Script 編輯器執行一次 <code>setupStandupWatch()</code> 授權排程（會額外要求日曆的編輯權限）。<br>快速倒數計時（1~60 分鐘）在首頁「起立提醒」標題列，不用切到這裡也能直接啟動。</div>
+      <div class="hint" style="margin-top:8px;">首次使用需執行一次 <code>setupStandupWatch()</code> 授權</div>
       <button class="btn" onclick="saveStandupSettings()" style="margin-top:8px;">儲存</button>
     </div>
 
