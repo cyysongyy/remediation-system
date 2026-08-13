@@ -40,15 +40,15 @@ a{color:var(--pri);}
 button,input,textarea{font-family:inherit;}
 button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:8px;}
 .wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;}
-.hero{position:relative;overflow:hidden;border-radius:20px;padding:20px 84px 26px 20px;margin-bottom:16px;
-  background:radial-gradient(circle at 82% 15%,rgba(139,92,246,.35),transparent 55%),
+.hero{position:relative;overflow:hidden;border-radius:20px;padding:20px 20px 30px;margin-bottom:16px;
+  background:radial-gradient(circle at 50% 30%,rgba(139,92,246,.30),transparent 60%),
              radial-gradient(circle at 6% 100%,rgba(76,29,149,.28),transparent 55%),
              linear-gradient(160deg,#0a0e1f,#0d1226 55%,#160b2e);
   color:#f1f5f9;box-shadow:0 18px 44px rgba(0,0,0,.32);}
 .heroDeco{position:absolute;width:56px;height:56px;border:1px solid rgba(148,163,184,.3);pointer-events:none;}
 .heroDeco.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;border-radius:20px 0 0 0;}
 .heroDeco.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;border-radius:0 20px 0 0;}
-.heroTop{display:flex;justify-content:flex-end;}
+.heroTop{display:flex;justify-content:flex-end;padding-right:44px;}
 .heroClock{font-size:.68rem;color:#cbd5e1;text-align:right;line-height:1.4;user-select:none;}
 .heroClock .clockTime{font-weight:700;color:#fff;}
 .heroClock .clockLunar{color:#94a3b8;}
@@ -60,18 +60,34 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroSub{font-size:.86rem;color:#e2e8f0;margin-top:12px;font-weight:600;}
 .heroSub a{color:#c4b5fd;font-weight:700;}
 .heroFeatures{font-size:.7rem;color:#a5b4fc;margin-top:4px;}
-.heroOrb{position:absolute;right:16px;bottom:16px;width:64px;height:64px;}
-.heroOrbRing{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(167,139,250,.4);}
-.heroOrbRing.r2{inset:-10px;border-color:rgba(167,139,250,.2);}
-.heroOrbCore{position:absolute;inset:8px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#c4b5fd,#7c3aed 65%,#4c1d95);
-  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.2rem;
-  box-shadow:0 0 20px rgba(139,92,246,.6),inset 0 0 10px rgba(255,255,255,.3);
+
+/* 中央全息投影風格 Logo：外圈軌道＋粒子點＋發光核心＋投影光束與底座光暈 */
+.heroOrbGroup{display:flex;flex-direction:column;align-items:center;margin-top:22px;}
+.heroOrbWrap{position:relative;width:128px;height:128px;flex-shrink:0;}
+.heroOrbRing{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(167,139,250,.28);}
+.heroOrbRing.outer{animation:heroSpin 34s linear infinite;}
+.heroOrbRing.mid{inset:16px;border-style:dashed;border-color:rgba(167,139,250,.32);animation:heroSpin 22s linear infinite reverse;}
+.heroOrbDot{position:absolute;width:5px;height:5px;border-radius:50%;background:#c4b5fd;box-shadow:0 0 8px #c4b5fd,0 0 2px #fff;}
+.heroOrbDot.d1{top:-2px;left:50%;margin-left:-2.5px;}
+.heroOrbDot.d2{top:18%;right:-3px;}
+.heroOrbDot.d3{bottom:12%;left:-3px;}
+.heroOrbCore{position:absolute;inset:26px;border-radius:50%;
+  background:radial-gradient(circle at 35% 28%,#f3e8ff,#c4b5fd 45%,#7c3aed 85%);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:2.1rem;
+  box-shadow:0 0 34px rgba(167,139,250,.8),0 0 64px rgba(139,92,246,.4),inset 0 0 16px rgba(255,255,255,.4);
   animation:heroPulse 3s ease-in-out infinite;}
+.heroOrbBeam{width:16px;height:34px;margin-top:-4px;
+  background:linear-gradient(180deg,rgba(196,181,253,.55),rgba(196,181,253,0));filter:blur(.5px);}
+.heroOrbBase{position:relative;width:128px;height:26px;margin-top:-4px;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(167,139,250,.42),rgba(167,139,250,.1) 55%,transparent 75%);}
+.heroOrbBase::before,.heroOrbBase::after{content:'';position:absolute;border-radius:50%;border:1px solid rgba(167,139,250,.22);}
+.heroOrbBase::before{inset:-7px 20px;}
+.heroOrbBase::after{inset:-14px 34px;border-color:rgba(167,139,250,.13);}
 @keyframes heroPulse{
-  0%,100%{box-shadow:0 0 20px rgba(139,92,246,.6),inset 0 0 10px rgba(255,255,255,.3);}
-  50%{box-shadow:0 0 32px rgba(139,92,246,.85),inset 0 0 14px rgba(255,255,255,.4);}
+  0%,100%{box-shadow:0 0 34px rgba(167,139,250,.8),0 0 64px rgba(139,92,246,.4),inset 0 0 16px rgba(255,255,255,.4);}
+  50%{box-shadow:0 0 48px rgba(167,139,250,1),0 0 84px rgba(139,92,246,.55),inset 0 0 20px rgba(255,255,255,.5);}
 }
+@keyframes heroSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 .theme-btn{background:var(--card);border:1px solid var(--line);color:var(--tx);width:38px;height:38px;
   border-radius:50%;cursor:pointer;font-size:1.05rem;display:flex;align-items:center;justify-content:center;
   box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s;}
@@ -236,10 +252,17 @@ textarea.fi{resize:vertical;min-height:56px;}
     <div class="heroTagline">Your Personal AI Assistant</div>
     <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
     <div class="heroFeatures">整合行程．智能提醒．高效生活</div>
-    <div class="heroOrb">
-      <div class="heroOrbRing r2"></div>
-      <div class="heroOrbRing"></div>
-      <div class="heroOrbCore">Y</div>
+    <div class="heroOrbGroup">
+      <div class="heroOrbWrap">
+        <div class="heroOrbRing outer"></div>
+        <div class="heroOrbRing mid"></div>
+        <span class="heroOrbDot d1"></span>
+        <span class="heroOrbDot d2"></span>
+        <span class="heroOrbDot d3"></span>
+        <div class="heroOrbCore">Y</div>
+      </div>
+      <div class="heroOrbBeam"></div>
+      <div class="heroOrbBase"></div>
     </div>
   </div>
 
