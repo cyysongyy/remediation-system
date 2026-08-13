@@ -8,10 +8,10 @@
 :root{
   --edu:#4f46e5;--edu2:#3730a3;
   --hlt:#0d9488;--hlt2:#0ea5e9;
-  --bot:#6d28d9;--bot2:#4c1d95;
   --pa:#b45309;--pa2:#78350f;
   --mp:#be123c;--mp2:#881337;
   --fd:#0369a1;--fd2:#0c4a6e;
+  --zn:#0f766e;--zn2:#134e4a;
   --tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;
   --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;
 }
@@ -38,34 +38,33 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .app::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;}
 .app.edu::before{background:linear-gradient(90deg,var(--edu),var(--edu2));}
 .app.hlt::before{background:linear-gradient(90deg,var(--hlt),var(--hlt2));}
-.app.bot::before{background:linear-gradient(90deg,var(--bot),var(--bot2));}
 .app.pa::before{background:linear-gradient(90deg,var(--pa),var(--pa2));}
 .app.mp::before{background:linear-gradient(90deg,var(--mp),var(--mp2));}
 .app.fd::before{background:linear-gradient(90deg,var(--fd),var(--fd2));}
+.app.zn::before{background:linear-gradient(90deg,var(--zn),var(--zn2));}
 .icon{font-size:2.8rem;margin-bottom:12px;}
 .app h2{font-size:1.18rem;font-weight:800;margin-bottom:4px;}
 .tag{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-block;margin-bottom:12px;width:fit-content;}
 .app.edu .tag{background:rgba(79,70,229,.12);color:var(--edu);}
 .app.hlt .tag{background:rgba(13,148,136,.14);color:var(--hlt);}
-.app.bot .tag{background:rgba(109,40,217,.12);color:var(--bot);}
 .app.pa .tag{background:rgba(180,83,9,.14);color:var(--pa);}
 .app.mp .tag{background:rgba(190,18,60,.12);color:var(--mp);}
 .app.fd .tag{background:rgba(3,105,161,.12);color:var(--fd);}
+.app.zn .tag{background:rgba(15,118,110,.12);color:var(--zn);}
 .desc{font-size:.86rem;color:var(--tx2);line-height:1.6;flex:1;}
 .feat{list-style:none;margin:14px 0 16px;padding:0;}
 .feat li{font-size:.8rem;color:var(--tx2);padding:3px 0 3px 20px;position:relative;}
 .feat li::before{content:'✓';position:absolute;left:0;font-weight:800;}
 .app.edu .feat li::before{color:var(--edu);}
 .app.hlt .feat li::before{color:var(--hlt);}
-.app.bot .feat li::before{color:var(--bot);}
 .cta{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:.88rem;padding:10px 18px;
   border-radius:10px;color:#fff;width:fit-content;transition:opacity .15s;}
 .app.edu .cta{background:linear-gradient(135deg,var(--edu),var(--edu2));}
 .app.hlt .cta{background:linear-gradient(135deg,var(--hlt),var(--hlt2));}
-.app.bot .cta{background:linear-gradient(135deg,var(--bot),var(--bot2));}
 .app.pa .cta{background:linear-gradient(135deg,var(--pa),var(--pa2));}
 .app.mp .cta{background:linear-gradient(135deg,var(--mp),var(--mp2));}
 .app.fd .cta{background:linear-gradient(135deg,var(--fd),var(--fd2));}
+.app.zn .cta{background:linear-gradient(135deg,var(--zn),var(--zn2));}
 .app:hover .cta{opacity:.9;}
 .foot{margin-top:34px;text-align:center;color:var(--tx3);font-size:.76rem;line-height:1.7;max-width:600px;}
 .theme-btn{position:fixed;top:16px;right:16px;background:var(--card);border:1px solid var(--line);
@@ -79,7 +78,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 <div class="hero">
   <div class="logo">🧭</div>
   <h1>Young 的智慧系統</h1>
-  <div class="sub">你的 App 工具箱，一個入口。教學批改、個人健康、個人助理，加上校務、模擬與復健工具，多為單一 HTML、資料存本機。</div>
+  <div class="sub">你的 App 工具箱，一個入口。教學批改、個人健康，加上校務、模擬、復健與身心練習工具，多為單一 HTML、資料存本機。</div>
 </div>
 
 <div class="grid">
@@ -111,20 +110,6 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
     <span class="cta">開啟系統 →</span>
   </a>
 
-  <a class="app bot" href="ybot.html">
-    <div class="icon">🤖</div>
-    <span class="tag">個人助理 · Ybot</span>
-    <h2>Ybot</h2>
-    <div class="desc">整合行程、信件、待辦與其他系統摘要 → 隨時問答 → 主動提醒。</div>
-    <ul class="feat">
-      <li>對話問答（Gemini / GPT / NVIDIA）</li>
-      <li>Gmail 未讀信 + Google 日曆彙整</li>
-      <li>待辦／提醒到點主動寄信</li>
-      <li>每日 7 點自動寄「每日簡報」</li>
-    </ul>
-    <span class="cta">開啟系統 →</span>
-  </a>
-
   <a class="app pa" href="https://cyysongyy.github.io/principal-assistant/" target="_blank" rel="noopener">
     <div class="icon">🏫</div>
     <span class="tag">校務 · 行政協作</span>
@@ -146,6 +131,14 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
     <span class="tag">復健 · 垂足訓練</span>
     <h2>垂足復健 5 步驟</h2>
     <div class="desc">垂足復健引導訓練，含分解動作與計時提示，獨立部署於另一個 repo。</div>
+    <span class="cta">開啟系統 ↗</span>
+  </a>
+
+  <a class="app zn" href="https://cyysongyy.github.io/zen-strength-reflection/" target="_blank" rel="noopener">
+    <div class="icon">🧘</div>
+    <span class="tag">身心 · 靜心與力量</span>
+    <h2>Zen Strength Reflection</h2>
+    <div class="desc">結合靜心、力量練習與自我省思的工具，獨立部署於另一個 repo。</div>
     <span class="cta">開啟系統 ↗</span>
   </a>
 </div>
