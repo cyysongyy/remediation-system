@@ -229,7 +229,7 @@ textarea.fi{resize:vertical;min-height:56px;}
 <button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;" onclick="toggleTheme()">🌓</button>
 
 <div class="wrap">
-  <div class="hero">
+  <div class="hero" id="heroCard">
     <div class="heroDeco tl"></div>
     <div class="heroDeco tr"></div>
     <div class="heroTop">
@@ -472,6 +472,7 @@ applyFontScale();
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
+  document.getElementById('heroCard').style.display=name==='chat'?'':'none';
   if(name==='notes')renderNotes();
   if(name==='settings')fillSettings();
 }
