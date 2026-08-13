@@ -357,11 +357,6 @@ textarea.fi{resize:vertical;min-height:56px;}
           <button class="btn ghost" onclick="useGpsLocation()" style="flex:0 0 auto;">📍 使用目前位置</button>
           <span id="gpsStatus" class="hint" style="margin:0;align-self:center;"></span>
         </div>
-        <div class="hint">城市名稱即可（例如「台北」「高雄」），或按「使用目前位置」用手機/瀏覽器 GPS 自動定位（需允許定位權限）。用於首頁天氣與每日簡報，預設台北。</div>
-      </div>
-      <div class="hint">
-        設定後可：待辦／提醒同步雲端、彙整 Gmail 未讀信與日曆行程、每日 7 點自動寄「Ybot 每日簡報」、提醒到點主動寄信。<br>
-        部署步驟：開一份 Google 試算表 → 擴充功能 → Apps Script → 貼上 <code>ybot-backend.gs</code> → 執行一次 <code>setupDailyBrief()</code>、<code>setupReminderWatch()</code>、<code>setupEveningDigest()</code> 授權 → 部署為網頁應用程式（執行身分：我；存取：所有人）→ 複製網址貼在這裡。每日簡報會依🔴今天必須／🟠建議今天／🟢可延後分級；晚間彙整只在還有未處理的🔴🟠事項時才會寄信，平時不打擾。
       </div>
       <div class="row2" style="margin-top:8px;">
         <button class="btn" onclick="saveSettings(false);testConnection()">🔌 測試連線</button>
