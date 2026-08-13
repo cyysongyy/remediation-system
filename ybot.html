@@ -49,6 +49,7 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroDeco.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;border-radius:20px 0 0 0;}
 .heroDeco.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;border-radius:0 20px 0 0;}
 .heroTop{display:flex;justify-content:space-between;align-items:flex-start;padding-right:44px;gap:10px;}
+.heroLeftCol{display:flex;flex-direction:column;align-items:flex-start;flex-shrink:0;}
 .heroWeatherMini{display:flex;align-items:center;gap:5px;font-size:.78rem;color:#e2e8f0;flex-shrink:0;}
 .heroWeatherMini .icon{font-size:1.15rem;line-height:1;}
 .heroWeatherMini .t{font-weight:800;font-size:.95rem;color:#fff;}
@@ -68,7 +69,7 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroFeatures{font-size:.7rem;color:#a5b4fc;margin-top:4px;}
 
 /* 全息投影風格 Logo：外圈軌道＋粒子點＋發光核心＋投影光束與底座光暈，取代文字 Logo，置於左上角 */
-.heroOrbGroup{display:flex;flex-direction:column;align-items:center;width:fit-content;margin-top:6px;}
+.heroOrbGroup{display:flex;flex-direction:column;align-items:center;width:fit-content;margin-top:10px;}
 .heroOrbWrap{position:relative;width:75px;height:75px;flex-shrink:0;}
 .heroOrbRing{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(167,139,250,.28);}
 .heroOrbRing.outer{animation:heroSpin 34s linear infinite;}
@@ -236,23 +237,25 @@ textarea.fi{resize:vertical;min-height:56px;}
     <div class="heroDeco tl"></div>
     <div class="heroDeco tr"></div>
     <div class="heroTop">
-      <div class="heroWeatherMini" id="heroWeatherMini"></div>
+      <div class="heroLeftCol">
+        <div class="heroWeatherMini" id="heroWeatherMini"></div>
+        <div class="heroOrbGroup">
+          <div class="heroOrbWrap">
+            <div class="heroOrbRing outer"></div>
+            <div class="heroOrbRing mid"></div>
+            <span class="heroOrbDot d1"></span>
+            <span class="heroOrbDot d2"></span>
+            <span class="heroOrbDot d3"></span>
+            <div class="heroOrbCore">Ybot</div>
+          </div>
+          <div class="heroOrbBeam"></div>
+          <div class="heroOrbBase"></div>
+        </div>
+      </div>
       <div class="heroTopRight">
         <div class="heroClock" id="clockBox"></div>
         <div class="heroScheduleMini" id="heroScheduleMini"></div>
       </div>
-    </div>
-    <div class="heroOrbGroup">
-      <div class="heroOrbWrap">
-        <div class="heroOrbRing outer"></div>
-        <div class="heroOrbRing mid"></div>
-        <span class="heroOrbDot d1"></span>
-        <span class="heroOrbDot d2"></span>
-        <span class="heroOrbDot d3"></span>
-        <div class="heroOrbCore">Ybot</div>
-      </div>
-      <div class="heroOrbBeam"></div>
-      <div class="heroOrbBase"></div>
     </div>
     <div class="heroTagline">Your Personal AI Assistant</div>
     <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
@@ -1331,7 +1334,8 @@ renderChat();
 renderNotes();
 renderLinkChips();
 initCountdownUI();
-if(state.context){showCtxStatus();renderOverview();}
+if(state.context)showCtxStatus();
+renderOverview();
 if(state.gasUrl)refreshContext();
 tryAutoLocate();
 </script>
