@@ -270,7 +270,7 @@ function clearNewsCache() {
   return '✅ 已清除新聞快取，下次抓取會是最新設定的結果';
 }
 // 新聞彙整：國內／國際／教育各 2 則，來源 Google 新聞 RSS（免金鑰）。
-// 快取 30 分鐘，避免每次開啟 Ybot 或重新整理都重打新聞來源。
+// 快取 15 分鐘（原本 30 分鐘），提高新聞輪替更新的頻率。
 function getNewsDigest() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get('newsDigest');
@@ -282,7 +282,7 @@ function getNewsDigest() {
     world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 2),
     education: fetchNewsRss('https://news.google.com/rss/search?q=%E6%95%99%E8%82%B2&hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2)
   };
-  try { cache.put('newsDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過 CacheService 容量就不快取，下次仍會重抓 */ }
+  try { cache.put('newsDigest', JSON.stringify(out), 900); } catch (err) { /* 超過 CacheService 容量就不快取，下次仍會重抓 */ }
   return out;
 }
 function fetchNewsRss(url, limit) {

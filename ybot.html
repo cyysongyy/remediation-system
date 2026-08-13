@@ -1336,6 +1336,9 @@ if(state.context)showCtxStatus();
 renderOverview();
 if(state.gasUrl)refreshContext();
 tryAutoLocate();
+// 頁面開著不動也會定期背景重新整理雲端資料（天氣／新聞／行程等），
+// 不用手動按「重新整理資料」或重新整理整個頁面才看得到最新內容。
+setInterval(()=>{if(state.gasUrl)refreshContext();},15*60000);
 </script>
 </body>
 </html>
