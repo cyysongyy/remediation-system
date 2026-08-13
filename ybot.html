@@ -60,7 +60,6 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .heroScheduleMini{flex:1;min-width:0;font-size:.85rem;text-align:left;padding-top:8px;}
 .heroScheduleMini a{color:#e2e8f0;text-decoration:none;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;}
 .heroScheduleMini a:hover{color:#c4b5fd;}
-.heroScheduleMini .t{color:#a78bfa;font-weight:700;margin-right:5px;}
 .heroScheduleMini .more{color:#a78bfa;font-size:.78rem;}
 .heroTagline{font-size:.6rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;margin-top:14px;text-transform:uppercase;}
 .heroSub{font-size:.86rem;color:#e2e8f0;margin-top:10px;font-weight:600;}
@@ -980,8 +979,7 @@ function renderHeroSchedule(events){
   const LIMIT=4;
   const items=events.slice(0,LIMIT).map(ev=>{
     const d=new Date(ev.start);
-    const t=ev.allDay?'全天':d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-    return `<a href="${gcalDayUrl(d)}" target="_blank" rel="noopener"><span class="t">${esc(t)}</span>${esc(ev.title)}</a>`;
+    return `<a href="${gcalDayUrl(d)}" target="_blank" rel="noopener">${esc(ev.title)}</a>`;
   }).join('');
   const more=events.length>LIMIT?`<a class="more" href="https://calendar.google.com/calendar/" target="_blank" rel="noopener">+${events.length-LIMIT} 項 ↗</a>`:'';
   el.innerHTML=items+more;
