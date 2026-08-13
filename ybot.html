@@ -147,9 +147,18 @@ textarea.fi{resize:vertical;min-height:56px;}
 .linkChips a.chip{text-decoration:none;}
 
 /* Overview */
-.ovSection{margin-bottom:12px;}
-.ovSection:last-child{margin-bottom:0;}
-.ovLabel{font-size:.72rem;font-weight:800;color:var(--tx2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
+#overviewCard{background-image:linear-gradient(180deg,rgba(109,40,217,.07),transparent 45%);}
+.ovMono{font-family:'SF Mono','Roboto Mono',ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
+.ovLivePulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 0 0 rgba(5,150,105,.5);animation:ovPulse 2s infinite;flex-shrink:0;}
+@keyframes ovPulse{
+  0%{box-shadow:0 0 0 0 rgba(5,150,105,.5);}
+  70%{box-shadow:0 0 0 6px rgba(5,150,105,0);}
+  100%{box-shadow:0 0 0 0 rgba(5,150,105,0);}
+}
+.ovSection{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);}
+.ovSection:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+.ovLabel{font-size:.72rem;font-weight:800;color:var(--tx2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
 .ovItem{font-size:.84rem;line-height:1.6;padding:2px 0;}
 .ovItem a{color:var(--tx);text-decoration:none;}
 .ovItem a:hover{color:var(--pri);text-decoration:underline;}
@@ -160,6 +169,31 @@ textarea.fi{resize:vertical;min-height:56px;}
 .ovNewsGroup b{font-size:.78rem;color:var(--tx2);}
 .ovLabelToggle{cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;padding:4px 0;margin:-4px 0 2px;-webkit-tap-highlight-color:rgba(109,40,217,.15);}
 .ovToggleIcon{font-size:.68rem;color:var(--tx3);}
+
+.ovWeatherRow{display:flex;align-items:center;gap:12px;}
+.ovWeatherIcon{width:46px;height:46px;border-radius:14px;flex-shrink:0;font-size:1.55rem;
+  background:linear-gradient(135deg,rgba(109,40,217,.16),rgba(76,29,149,.08));
+  display:flex;align-items:center;justify-content:center;}
+.ovWeatherInfo{flex:1;min-width:0;}
+.ovWeatherCity{font-size:.84rem;color:var(--tx);font-weight:700;}
+.ovWeatherDesc{font-size:.72rem;color:var(--tx3);margin-top:1px;}
+.ovWeatherStat{text-align:right;flex-shrink:0;}
+.ovWeatherTemp{font-size:1.4rem;font-weight:800;color:var(--pri);line-height:1;}
+.ovWeatherMeta{font-size:.68rem;color:var(--tx3);margin-top:4px;}
+
+.ovTimeline{display:flex;flex-direction:column;}
+.ovTimelineItem{position:relative;padding:3px 0 3px 20px;}
+.ovTimelineItem::before{content:'';position:absolute;left:3px;top:11px;width:6px;height:6px;border-radius:50%;
+  background:var(--pri);box-shadow:0 0 0 3px rgba(109,40,217,.15);}
+.ovTimelineItem::after{content:'';position:absolute;left:5.5px;top:17px;bottom:-3px;width:1px;background:var(--line);}
+.ovTimelineItem:last-child::after{display:none;}
+.ovTimeChip{font-size:.68rem;font-weight:700;color:var(--pri);background:rgba(109,40,217,.09);
+  border-radius:6px;padding:1px 6px;margin-right:6px;white-space:nowrap;display:inline-block;}
+
+.ovMailItem{display:flex;align-items:flex-start;gap:8px;padding:2px 0;}
+.ovMailBadge{flex-shrink:0;width:20px;height:20px;border-radius:6px;background:rgba(217,119,6,.14);
+  display:flex;align-items:center;justify-content:center;font-size:.66rem;margin-top:2px;}
+.ovMailBadge.plain{background:rgba(148,163,184,.16);}
 
 /* Clock */
 .clockBox{position:fixed;top:16px;right:62px;z-index:9;text-align:right;
@@ -905,22 +939,26 @@ function renderOverview(){
 
   const w=c.weather;
   const weatherHtml=w
-    ? `<div class="ovItem">${esc(w.icon||'🌡️')} ${esc(w.city||'')}　${esc(w.desc||'')}　現在 ${w.temp}°C（今日 ${w.tMin}~${w.tMax}°C，降雨機率 ${w.rainChance??'—'}%）</div>`
+    ? `<div class="ovWeatherRow">`+
+      `<div class="ovWeatherIcon">${esc(w.icon||'🌡️')}</div>`+
+      `<div class="ovWeatherInfo"><div class="ovWeatherCity">${esc(w.city||'')}</div><div class="ovWeatherDesc">${esc(w.desc||'')}</div></div>`+
+      `<div class="ovWeatherStat"><div class="ovWeatherTemp ovMono">${w.temp}°</div><div class="ovWeatherMeta ovMono">${w.tMin}~${w.tMax}° · 💧${w.rainChance??'—'}%</div></div>`+
+      `</div>`
     : `<div class="ovItem ovEmpty">暫無天氣資料 · <a href="javascript:void(0)" onclick="useGpsLocation()">📍 點此使用目前位置</a></div>`;
 
   const todayStr=new Date().toDateString();
   const todayEvents=(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr);
   const scheduleHtml=todayEvents.length
-    ? todayEvents.map(ev=>{
+    ? `<div class="ovTimeline">`+todayEvents.map(ev=>{
         const d=new Date(ev.start);
         const t=ev.allDay?'全天':d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-        return `<div class="ovItem"><a href="${gcalDayUrl(d)}" target="_blank" rel="noopener">${esc(t)}　${esc(ev.title)}</a></div>`;
-      }).join('')
+        return `<div class="ovTimelineItem"><a href="${gcalDayUrl(d)}" target="_blank" rel="noopener"><span class="ovTimeChip ovMono">${esc(t)}</span>${esc(ev.title)}</a></div>`;
+      }).join('')+`</div>`
     : `<div class="ovItem ovEmpty">今天沒有排定的行程</div>`;
 
   const mails=c.gmail||[];
   const mailHtml=mails.length
-    ? mails.map(m=>`<div class="ovItem">${m.important?'💳 ':''}${esc(m.subject)} <span class="ovSub">（${esc(m.from)}）</span></div>`).join('')
+    ? mails.map(m=>`<div class="ovMailItem"><span class="ovMailBadge${m.important?'':' plain'}">${m.important?'💳':'✉️'}</span><span>${esc(m.subject)} <span class="ovSub">（${esc(m.from)}）</span></span></div>`).join('')
     : `<div class="ovItem ovEmpty">沒有未讀的重要信件</div>`;
 
   const news=c.news||{};
@@ -957,7 +995,7 @@ function renderOverview(){
 
   const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
-    `<div class="section-title">☀️ 今日總覽</div>`+
+    `<div class="section-title"><span class="ovLivePulse" title="資料即時更新"></span>☀️ 今日總覽</div>`+
     `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
