@@ -304,7 +304,9 @@ function getWeatherDigest() {
     coords = { lat: kv.weatherLat, lon: kv.weatherLon, name: '目前位置' };
   } else {
     const cityLabel = kv.weatherCity || '台北';
-    coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
+    // 縣市名稱（如「雲林」）在地理編碼 API 常會誤配到縣內同名小地方而非縣治所在，
+    // 有手動校正過座標的縣市一律優先用 DEFAULT_WEATHER_COORDS，不查即時地理編碼。
+    coords = DEFAULT_WEATHER_COORDS[cityLabel] || geocodeCity(cityLabel) || null;
   }
   if (!coords) return null;
 
@@ -347,7 +349,10 @@ const CITY_EN = {
 };
 const DEFAULT_WEATHER_COORDS = {
   '台北': { lat: 25.033, lon: 121.5654, name: '台北' },
-  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' }
+  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' },
+  // 雲林是縣名不是單一地點，地理編碼查「Yunlin」容易誤配到縣內同名小地方（如「Yongling」），
+  // 改用縣治斗六市的座標，結果較準確、穩定。
+  '雲林': { lat: 23.7092, lon: 120.5414, name: '雲林' }
 };
 function geocodeCity(name) {
   const cache = CacheService.getScriptCache();
