@@ -1096,7 +1096,7 @@ function renderChatImagePreview(){
 // ── 對話 ────────────────────────────────
 function renderChat(){
   const box=document.getElementById('chatBox');
-  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot！可以問我行程、待辦、信件摘要，或任何生活上的小事。也可以直接下指令，例如「幫我加待辦：明天下午3點開會」「提醒我禮拜五交作業」，我會直接幫你新增，牽涉到日期時間的還會自動加入 Google 日曆。</div>';return;}
+  if(!state.chat.length){box.innerHTML='<div class="msg sys">👋 你好，我是 Ybot，有什麼可以幫你？</div>';return;}
   box.innerHTML=state.chat.map(m=>`<div class="msg ${m.role}">${esc(m.text)}</div>`).join('');
   box.scrollTop=box.scrollHeight;
 }
