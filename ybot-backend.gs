@@ -263,6 +263,12 @@ function getCalendarDigest() {
   } catch (err) { return []; }
 }
 
+// 手動清除新聞快取用：改了新聞來源設定後，在 Apps Script 編輯器執行一次這個函式，
+// 不用等 30 分鐘快取自然過期就能立刻看到新設定的結果。
+function clearNewsCache() {
+  CacheService.getScriptCache().remove('newsDigest');
+  return '✅ 已清除新聞快取，下次抓取會是最新設定的結果';
+}
 // 新聞彙整：國內／國際／教育各 2 則，來源 Google 新聞 RSS（免金鑰）。
 // 快取 30 分鐘，避免每次開啟 Ybot 或重新整理都重打新聞來源。
 function getNewsDigest() {
