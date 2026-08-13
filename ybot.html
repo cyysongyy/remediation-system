@@ -215,17 +215,6 @@ textarea.fi{resize:vertical;min-height:56px;}
 .ovLabelToggle{cursor:pointer;display:flex;align-items:center;gap:4px;user-select:none;padding:4px 0;margin:-4px 0 2px;-webkit-tap-highlight-color:rgba(109,40,217,.15);}
 .ovToggleIcon{font-size:.68rem;color:var(--tx3);}
 
-.ovWeatherRow{display:flex;align-items:center;gap:8px;}
-.ovWeatherIcon{width:30px;height:30px;border-radius:9px;flex-shrink:0;font-size:1rem;
-  background:linear-gradient(135deg,rgba(109,40,217,.16),rgba(76,29,149,.08));
-  display:flex;align-items:center;justify-content:center;}
-.ovWeatherInfo{flex:1;min-width:0;}
-.ovWeatherCity{font-size:.78rem;color:var(--tx);font-weight:700;}
-.ovWeatherDesc{font-size:.66rem;color:var(--tx3);margin-top:1px;}
-.ovWeatherStat{text-align:right;flex-shrink:0;}
-.ovWeatherTemp{font-size:1.05rem;font-weight:800;color:var(--pri);line-height:1;}
-.ovWeatherMeta{font-size:.62rem;color:var(--tx3);margin-top:3px;}
-
 .ovTimeline{display:flex;flex-direction:column;}
 .ovTimelineItem{position:relative;padding:3px 0 3px 20px;}
 .ovTimelineItem::before{content:'';position:absolute;left:3px;top:11px;width:6px;height:6px;border-radius:50%;
@@ -979,22 +968,13 @@ function renderHeroWeather(w){
   if(!el)return;
   el.innerHTML=w
     ? `<span class="icon">${esc(w.icon||'🌡️')}</span><span class="t">${w.temp}°</span><span class="d">${esc(w.desc||'')}</span>`
-    : '';
+    : `<a href="javascript:void(0)" onclick="useGpsLocation()" style="color:#c4b5fd;font-size:.72rem;">📍 定位天氣</a>`;
 }
 function renderOverview(){
   const box=document.getElementById('overviewCard');
   const c=state.context;
   renderHeroWeather(c&&c.weather);
   if(!c){box.style.display='none';box.innerHTML='';return;}
-
-  const w=c.weather;
-  const weatherHtml=w
-    ? `<div class="ovWeatherRow">`+
-      `<div class="ovWeatherIcon">${esc(w.icon||'🌡️')}</div>`+
-      `<div class="ovWeatherInfo"><div class="ovWeatherCity">${esc(w.city||'')}</div><div class="ovWeatherDesc">${esc(w.desc||'')}</div></div>`+
-      `<div class="ovWeatherStat"><div class="ovWeatherTemp ovMono">${w.temp}°</div><div class="ovWeatherMeta ovMono">${w.tMin}~${w.tMax}° · 💧${w.rainChance??'—'}%</div></div>`+
-      `</div>`
-    : `<div class="ovItem ovEmpty">暫無天氣資料 · <a href="javascript:void(0)" onclick="useGpsLocation()">📍 點此使用目前位置</a></div>`;
 
   const todayStr=new Date().toDateString();
   const todayEvents=(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr);
@@ -1046,7 +1026,6 @@ function renderOverview(){
   const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
     `<div class="section-title"><span class="ovLivePulse" title="資料即時更新"></span>☀️ 今日總覽</div>`+
-    `<div class="ovSection"><div class="ovLabel">🌤️ 今日天氣</div>${weatherHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📅 今日行程 <a href="https://calendar.google.com/calendar/" target="_blank" rel="noopener" style="font-size:.7rem;font-weight:700;">開啟 Google 日曆 ↗</a></div>${scheduleHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`+
