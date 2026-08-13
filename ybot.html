@@ -40,12 +40,38 @@ a{color:var(--pri);}
 button,input,textarea{font-family:inherit;}
 button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:8px;}
 .wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:4px 0 18px;margin-bottom:2px;border-bottom:1px solid var(--line);}
-.brand{display:flex;align-items:center;gap:12px;}
-.brand .logo{font-size:1.35rem;width:42px;height:42px;border-radius:12px;flex-shrink:0;
-  background:linear-gradient(135deg,var(--pri),var(--pri2));display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-pri);}
-.brand h1{font-size:1.16rem;font-weight:800;letter-spacing:-.01em;}
-.brand .sub{font-size:.72rem;color:var(--tx3);margin-top:2px;}
+.hero{position:relative;overflow:hidden;border-radius:20px;padding:20px 84px 26px 20px;margin-bottom:16px;
+  background:radial-gradient(circle at 82% 15%,rgba(139,92,246,.35),transparent 55%),
+             radial-gradient(circle at 6% 100%,rgba(76,29,149,.28),transparent 55%),
+             linear-gradient(160deg,#0a0e1f,#0d1226 55%,#160b2e);
+  color:#f1f5f9;box-shadow:0 18px 44px rgba(0,0,0,.32);}
+.heroDeco{position:absolute;width:56px;height:56px;border:1px solid rgba(148,163,184,.3);pointer-events:none;}
+.heroDeco.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;border-radius:20px 0 0 0;}
+.heroDeco.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;border-radius:0 20px 0 0;}
+.heroTop{display:flex;justify-content:flex-end;}
+.heroClock{font-size:.68rem;color:#cbd5e1;text-align:right;line-height:1.4;user-select:none;}
+.heroClock .clockTime{font-weight:700;color:#fff;}
+.heroClock .clockLunar{color:#94a3b8;}
+.heroWordmark{font-size:2.3rem;font-weight:900;letter-spacing:-.02em;margin-top:8px;
+  background:linear-gradient(135deg,#ffffff,#c4b5fd 60%,#8b5cf6);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 16px rgba(139,92,246,.45));line-height:1;}
+.heroTagline{font-size:.58rem;letter-spacing:.16em;color:#a78bfa;font-weight:700;margin-top:6px;text-transform:uppercase;}
+.heroSub{font-size:.86rem;color:#e2e8f0;margin-top:12px;font-weight:600;}
+.heroSub a{color:#c4b5fd;font-weight:700;}
+.heroFeatures{font-size:.7rem;color:#a5b4fc;margin-top:4px;}
+.heroOrb{position:absolute;right:16px;bottom:16px;width:64px;height:64px;}
+.heroOrbRing{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(167,139,250,.4);}
+.heroOrbRing.r2{inset:-10px;border-color:rgba(167,139,250,.2);}
+.heroOrbCore{position:absolute;inset:8px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#c4b5fd,#7c3aed 65%,#4c1d95);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.2rem;
+  box-shadow:0 0 20px rgba(139,92,246,.6),inset 0 0 10px rgba(255,255,255,.3);
+  animation:heroPulse 3s ease-in-out infinite;}
+@keyframes heroPulse{
+  0%,100%{box-shadow:0 0 20px rgba(139,92,246,.6),inset 0 0 10px rgba(255,255,255,.3);}
+  50%{box-shadow:0 0 32px rgba(139,92,246,.85),inset 0 0 14px rgba(255,255,255,.4);}
+}
 .theme-btn{background:var(--card);border:1px solid var(--line);color:var(--tx);width:38px;height:38px;
   border-radius:50%;cursor:pointer;font-size:1.05rem;display:flex;align-items:center;justify-content:center;
   box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s;}
@@ -196,25 +222,24 @@ textarea.fi{resize:vertical;min-height:56px;}
   display:flex;align-items:center;justify-content:center;font-size:.66rem;margin-top:2px;}
 .ovMailBadge.plain{background:rgba(148,163,184,.16);}
 
-/* Clock */
-.clockBox{position:fixed;top:16px;right:62px;z-index:9;text-align:right;
-  font-size:.72rem;color:var(--tx2);line-height:1.4;user-select:none;}
-.clockBox .clockTime{font-weight:700;}
-.clockBox .clockLunar{color:var(--tx3);}
 </style>
 </head>
 <body>
-<div class="clockBox" id="clockBox"></div>
 <button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;" onclick="toggleTheme()">🌓</button>
 
 <div class="wrap">
-  <div class="topbar">
-    <div class="brand">
-      <div class="logo">🤖</div>
-      <div>
-        <h1>Ybot</h1>
-        <div class="sub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
-      </div>
+  <div class="hero">
+    <div class="heroDeco tl"></div>
+    <div class="heroDeco tr"></div>
+    <div class="heroTop"><div class="heroClock" id="clockBox"></div></div>
+    <div class="heroWordmark">Ybot</div>
+    <div class="heroTagline">Your Personal AI Assistant</div>
+    <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
+    <div class="heroFeatures">整合行程．智能提醒．高效生活</div>
+    <div class="heroOrb">
+      <div class="heroOrbRing r2"></div>
+      <div class="heroOrbRing"></div>
+      <div class="heroOrbCore">Y</div>
     </div>
   </div>
 
