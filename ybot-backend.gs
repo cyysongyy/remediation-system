@@ -269,9 +269,11 @@ function getNewsDigest() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get('newsDigest');
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
+  // 國際新聞改用英文（美國）語系，來源會是 CNN／Reuters／AP／BBC 等主流英語媒體，
+  // 跟國內/教育新聞（中文語系）分開設定。
   const out = {
     domestic: fetchNewsRss('https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
-    world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
+    world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 2),
     education: fetchNewsRss('https://news.google.com/rss/search?q=%E6%95%99%E8%82%B2&hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2)
   };
   try { cache.put('newsDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過 CacheService 容量就不快取，下次仍會重抓 */ }
