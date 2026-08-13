@@ -269,9 +269,11 @@ function getNewsDigest() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get('newsDigest');
   if (cached) { try { return JSON.parse(cached); } catch (err) { /* 快取壞掉就重抓 */ } }
+  // 國際新聞改用英文（美國）語系，來源會是 CNN／Reuters／AP／BBC 等主流英語媒體，
+  // 跟國內/教育新聞（中文語系）分開設定。
   const out = {
     domestic: fetchNewsRss('https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
-    world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2),
+    world: fetchNewsRss('https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en', 2),
     education: fetchNewsRss('https://news.google.com/rss/search?q=%E6%95%99%E8%82%B2&hl=zh-TW&gl=TW&ceid=TW:zh-Tw', 2)
   };
   try { cache.put('newsDigest', JSON.stringify(out), 1800); } catch (err) { /* 超過 CacheService 容量就不快取，下次仍會重抓 */ }
@@ -304,7 +306,11 @@ function getWeatherDigest() {
     coords = { lat: kv.weatherLat, lon: kv.weatherLon, name: '目前位置' };
   } else {
     const cityLabel = kv.weatherCity || '台北';
-    coords = geocodeCity(cityLabel) || DEFAULT_WEATHER_COORDS[cityLabel] || null;
+    // 縣市名稱（如「雲林」）在地理編碼 API 常會誤配到縣內同名小地方而非縣治所在，
+    // 有手動校正過座標的縣市一律優先用 DEFAULT_WEATHER_COORDS，不查即時地理編碼；
+    // 中文、英文拼音（如「雲林」／「Yunlin」）都要能對到同一組固定座標。
+    const enLabel = CITY_EN[cityLabel] || cityLabel;
+    coords = DEFAULT_WEATHER_COORDS[cityLabel] || DEFAULT_WEATHER_COORDS[enLabel] || geocodeCity(cityLabel) || null;
   }
   if (!coords) return null;
 
@@ -347,7 +353,11 @@ const CITY_EN = {
 };
 const DEFAULT_WEATHER_COORDS = {
   '台北': { lat: 25.033, lon: 121.5654, name: '台北' },
-  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' }
+  '臺北': { lat: 25.033, lon: 121.5654, name: '台北' },
+  // 雲林是縣名不是單一地點，地理編碼查「Yunlin」容易誤配到縣內同名小地方（如「Yongling」），
+  // 改用縣治斗六市的座標，結果較準確、穩定。
+  '雲林': { lat: 23.7092, lon: 120.5414, name: '雲林' },
+  'Yunlin': { lat: 23.7092, lon: 120.5414, name: '雲林' }
 };
 function geocodeCity(name) {
   const cache = CacheService.getScriptCache();
