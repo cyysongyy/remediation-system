@@ -108,7 +108,7 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 
 /* 對話分頁：桌面/平板寬螢幕採 2×2 卡片網格排版，手機仍維持單欄堆疊 */
 @media(min-width:860px){
-  #pane-chat.active{display:grid;grid-template-columns:340px 1fr;grid-template-areas:"hero chat" "overview links";gap:18px;align-items:start;}
+  #pane-chat.active{display:grid;grid-template-columns:minmax(300px,38%) 1fr;grid-template-areas:"hero chat" "overview links";gap:18px;align-items:start;}
   #pane-chat #heroCard{grid-area:hero;margin-bottom:0;}
   #pane-chat #chatCard{grid-area:chat;margin-bottom:0;}
   #pane-chat #chatCard #chatBox{max-height:min(56vh,460px);}
@@ -774,8 +774,10 @@ function renderLinkChips(){
   const card=document.getElementById('linksCard');
   if(!box)return;
   const items=state.links.filter(l=>l.name&&l.url);
-  box.innerHTML=items.map(l=>`<a class="chip" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}</a>`).join('');
-  if(card)card.style.display=items.length?'':'none';
+  box.innerHTML=items.length
+    ? items.map(l=>`<a class="chip" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}</a>`).join('')
+    : `<div class="ovItem ovEmpty">還沒有常用連結，可在「設定 → 我的其他 App」新增</div>`;
+  if(card)card.style.display='';
 }
 function saveLinksAll(){
   save();renderLinkChips();
@@ -1054,7 +1056,11 @@ function renderOverview(){
   const todayStr=new Date().toDateString();
   const todayEvents=c?(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr):[];
   renderHeroSchedule(todayEvents);
-  if(!c){box.style.display='none';box.innerHTML='';return;}
+  if(!c){
+    box.style.display='block';
+    box.innerHTML=`<div class="section-title">☀️ 今日總覽</div><div class="ovItem ovEmpty">尚未連接雲端後台，請至「設定 → 雲端後台」連接後查看信件／新聞／起立提醒。</div>`;
+    return;
+  }
 
   const mails=c.gmail||[];
   const mailHtml=mails.length
