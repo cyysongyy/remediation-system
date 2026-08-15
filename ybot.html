@@ -218,6 +218,29 @@ textarea.fi{resize:vertical;min-height:56px;}
   70%{box-shadow:0 0 0 6px rgba(5,150,105,0);}
   100%{box-shadow:0 0 0 0 rgba(5,150,105,0);}
 }
+/* 儀表板統計列：甜甜圈進度圈＋統計方塊，仿參考圖 Dashboard Metrics 視覺 */
+.dashStats{display:flex;align-items:center;gap:14px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);}
+.dashRing{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.dashRingInner{width:48px;height:48px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:.86rem;color:var(--pri);}
+.dashRingInner span{font-size:.62rem;margin-left:1px;}
+.dashTiles{display:grid;grid-template-columns:1fr 1fr;gap:6px;flex:1;min-width:0;}
+.dashTile{border-radius:10px;padding:7px 8px;text-align:center;}
+.dashTile b{display:block;font-size:.98rem;font-weight:800;line-height:1.3;}
+.dashTile span{font-size:.6rem;color:var(--tx2);}
+.dashTile.todo{background:rgba(109,40,217,.1);}
+.dashTile.todo b{color:var(--pri);}
+.dashTile.mail{background:rgba(217,119,6,.12);}
+.dashTile.mail b{color:var(--warn);}
+.dashTile.news{background:rgba(3,105,161,.1);}
+.dashTile.news b{color:#0369a1;}
+.dashTile.standup{background:rgba(148,163,184,.16);}
+.dashTile.standup b{color:var(--tx2);}
+.dashTile.standup.on{background:rgba(5,150,105,.12);}
+.dashTile.standup.on b{color:var(--ok);}
+.dashTile.school{background:rgba(180,83,9,.12);}
+.dashTile.school b{color:#b45309;}
+
 .ovSection{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);}
 .ovSection:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 .ovLabel{font-size:.72rem;font-weight:800;color:var(--tx2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;}
@@ -280,7 +303,10 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div class="section-title">💬 Ybot 對話</div>
       <div class="ctxbar">
         <span id="ctxStatus">尚未載入雲端資料</span>
-        <button onclick="refreshContext()">🔄 重新整理資料</button>
+        <span style="display:flex;gap:10px;flex-shrink:0;">
+          <button onclick="refreshContext()">🔄 重新整理資料</button>
+          <button onclick="clearChatOnly()">🗑️ 清除對話</button>
+        </span>
       </div>
       <div id="chatBox"></div>
       <div id="chatImagePreview" style="display:none;"></div>
@@ -391,7 +417,7 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div class="field"><label>Gemini API Key</label><input id="geminiKey" class="fi" type="password" placeholder="AIzaSy… 或 AQ.…"></div>
       <div class="field"><label>OpenAI API Key</label><input id="openaiKey" class="fi" type="password" placeholder="sk-…"></div>
       <div class="field"><label>NVIDIA NIM API Key</label><input id="nvidiaKey" class="fi" type="password" placeholder="nvapi-…"></div>
-      <div class="hint">Key 僅存於你自己的瀏覽器，直接呼叫各家 API，不經第三方伺服器。免費取得：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a></div>
+      <div class="hint">Key 僅存於你自己的瀏覽器，直接呼叫各家 API，不經第三方伺服器。免費取得：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>。與「校長助理」共用同一個網域，貼過一次兩邊都能用。</div>
       <button class="btn" onclick="saveSettings(true)">儲存</button>
     </div>
 
@@ -428,6 +454,15 @@ textarea.fi{resize:vertical;min-height:56px;}
     </div>
 
     <div class="card">
+      <div class="section-title">🏫 校務管理系統（CK-SCHADMIN）</div>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:.86rem;cursor:pointer;">
+        <input type="checkbox" id="useSchoolDb" style="width:18px;height:18px;accent-color:var(--pri);" onchange="state.useSchoolDb=this.checked;save();">
+        對話時附上校務系統資料給 AI 參考
+      </label>
+      <div class="hint" style="margin-top:8px;">與校務系統同一個網域，直接唯讀讀取行事曆／行政業務／研習記錄／教職員資料（含聯絡方式），僅排除身分證字號、薪資與學生成績（不讀取）。需先在同一瀏覽器打開過一次 <a href="https://cyysongyy.github.io/CK-SCHADMIN/" target="_blank" rel="noopener">校務管理系統</a>並登入，本機才會有快取資料。</div>
+    </div>
+
+    <div class="card">
       <div class="section-title">🔗 我的其他 App</div>
       <div class="hint" style="margin-bottom:10px;">你在 GitHub 上的其他自建 App，可在對話中快速開啟、也讓 Ybot 知道它們存在。若該 App 有自己的 Apps Script 後台網址，填入「後台網址」欄位，Ybot 每日簡報與對話會一併嘗試帶入其摘要（讀不到會自動略過）。</div>
       <div id="linkList"></div>
@@ -448,11 +483,13 @@ const LS_KEY='ybot_v1';
 function defaults(){return{
   theme:'',fontScale:1,newsCollapsed:false,standupCollapsed:true,
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
+  useSchoolDb:false,
   gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
   standup:{enabled:false,intervalMin:60,startHour:8,endHour:18},
   countdownMin:5,
   links:[
     {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
+    {id:'ck-schadmin',name:'校務管理系統',url:'https://cyysongyy.github.io/CK-SCHADMIN/',apiUrl:''},
     {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
     {id:'footdrop-rehab',name:'垂足復健 5 步驟',url:'https://cyysongyy.github.io/5-steps-rehab-for-footdrop/',apiUrl:''}
   ],
@@ -463,6 +500,40 @@ let state;
 function load(){try{state=Object.assign(defaults(),JSON.parse(localStorage.getItem(LS_KEY))||{});}catch(e){state=defaults();}}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
 load();
+// links 陣列存進 localStorage 後，defaults() 新增的預設連結（例如後來才加的
+// 校務管理系統）不會自動出現在已經有舊資料的使用者畫面上，這裡補一次性遷移。
+(function migrateDefaultLinks(){
+  let changed=false;
+  defaults().links.forEach(def=>{
+    if(!state.links.some(l=>l.id===def.id)){state.links.push(def);changed=true;}
+  });
+  if(changed)save();
+})();
+
+// ── 與同一個 cyysongyy.github.io origin 底下的其他 App（例如校長助理）共用 AI Key ──
+// 瀏覽器 localStorage 是以 origin 為單位隔離、不分路徑，兩個 App 雖然是不同 repo，
+// 部署後其實同一個 origin，本來就共用同一份 localStorage，只是各自用不同 key 存。
+// 這裡只補一份「共用」快照：貼過 key 的那個 App 存進去，另一個 App 沒填過的欄位
+// 就撿來用；已經自己填過的欄位不會被覆蓋，避免兩邊金鑰不同時互相打架。
+const SHARED_AI_KEY='shared_ai_keys_v1';
+function loadSharedAiKeys(){
+  try{return JSON.parse(localStorage.getItem(SHARED_AI_KEY))||{};}catch(e){return{};}
+}
+function hydrateSharedAiKeys(){
+  const shared=loadSharedAiKeys();
+  ['gemini','openai','nvidia'].forEach(k=>{
+    if(!state.ai[k]&&shared[k])state.ai[k]=shared[k];
+  });
+}
+function pushSharedAiKeys(){
+  const shared=loadSharedAiKeys();
+  ['gemini','openai','nvidia'].forEach(k=>{
+    if(state.ai[k])shared[k]=state.ai[k];
+  });
+  shared.updatedAt=new Date().toISOString();
+  localStorage.setItem(SHARED_AI_KEY,JSON.stringify(shared));
+}
+hydrateSharedAiKeys();
 
 // ── 主題 ────────────────────────────────
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);}
@@ -510,6 +581,7 @@ function fillSettings(){
   document.getElementById('weatherCity').value=(state.weatherLat&&state.weatherLon)?`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`:state.weatherCity;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
+  document.getElementById('useSchoolDb').checked=!!state.useSchoolDb;
   populateHourSelects();
   document.getElementById('standupEnabled').checked=!!state.standup.enabled;
   document.getElementById('standupInterval').value=state.standup.intervalMin;
@@ -731,6 +803,7 @@ function saveSettings(showToast){
   state.ai.nvidia=document.getElementById('nvidiaKey').value.trim();
   state.gasUrl=document.getElementById('gasUrl').value.trim();
   save();
+  pushSharedAiKeys();
   if(showToast){const el=document.getElementById('connStatus');el.className='statusLine ok';el.textContent='✅ 已儲存';el.style.display='block';setTimeout(()=>el.style.display='none',1800);}
 }
 function saveLinked(){
@@ -787,9 +860,14 @@ function saveLinksAll(){
   }
   alert('已儲存');
 }
+function clearChatOnly(){
+  if(!state.chat.length)return;
+  if(!confirm('確定清除 Ybot 對話紀錄？（不影響待辦/筆記等其他資料）'))return;
+  state.chat=[];save();renderChat();
+}
 function clearLocal(){
   if(!confirm('確定清除本機的對話紀錄與筆記？（雲端資料不受影響）'))return;
-  state.chat=[];state.notes=[];save();renderChat();renderNotes();
+  state.chat=[];state.notes=[];save();renderChat();renderNotes();renderOverview();
 }
 
 // ── 待辦與筆記 ──────────────────────────
@@ -855,7 +933,7 @@ function blobToBase64(blob){
 }
 async function transcribeWithGemini(blob,mime){
   const b64=await blobToBase64(blob);
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${state.ai.gemini}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{parts:[
        {text:'請將這段語音逐字轉成繁體中文文字稿，只輸出文字稿內容本身，不要加任何說明、標題或引號。'},
@@ -891,7 +969,7 @@ function addNote(){
   state.notes.unshift(n);save();
   document.getElementById('noteContent').value='';
   document.getElementById('noteDue').value='';
-  renderNotes();
+  renderNotes();renderOverview();
   if(state.gasUrl){
     fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
   }
@@ -928,7 +1006,7 @@ async function addNoteAI(){
     state.notes.unshift(n);save();
     document.getElementById('noteContent').value='';
     document.getElementById('noteDue').value='';
-    renderNotes();
+    renderNotes();renderOverview();
     if(state.gasUrl){
       fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addNote',note:n})}).catch(()=>{});
     }
@@ -953,13 +1031,13 @@ async function addNoteAI(){
 }
 function toggleNote(id){
   const n=state.notes.find(x=>x.id===id);if(!n)return;
-  n.done=!n.done;save();renderNotes();
+  n.done=!n.done;save();renderNotes();renderOverview();
   if(state.gasUrl){
     fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'updateNote',id,patch:{done:n.done?'true':''}})}).catch(()=>{});
   }
 }
 function deleteNote(id){
-  state.notes=state.notes.filter(x=>x.id!==id);save();renderNotes();
+  state.notes=state.notes.filter(x=>x.id!==id);save();renderNotes();renderOverview();
   if(state.gasUrl){
     fetch(state.gasUrl,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteNote',id})}).catch(()=>{});
   }
@@ -1049,6 +1127,42 @@ function renderHeroSchedule(events){
   const more=events.length>LIMIT?`<a class="more" href="https://calendar.google.com/calendar/" target="_blank" rel="noopener">+${events.length-LIMIT} 項 ↗</a>`:'';
   el.innerHTML=items+more;
 }
+// 用真實本機／雲端資料組出小型儀表板（甜甜圈進度圈＋統計方塊），
+// 待辦完成率不需要雲端也能算；信件／新聞數量沒連雲端時顯示「—」。
+function buildDashStatsHtml(c){
+  const actionable=state.notes.filter(n=>n.type!=='note');
+  const doneCount=actionable.filter(n=>n.done).length;
+  const totalActionable=actionable.length;
+  const pct=totalActionable?Math.round(doneCount/totalActionable*100):0;
+  const pendingCount=totalActionable-doneCount;
+  const mailCount=c?(c.gmail||[]).length:null;
+  const news=c?(c.news||{}):{};
+  const newsCount=c?[...(news.domestic||[]),...(news.world||[]),...(news.education||[])].length:null;
+  const su=(c&&c.standup)||state.standup;
+  const standupOn=!!(su&&su.enabled);
+  return `<div class="dashStats">`+
+    `<div class="dashRing" style="background:conic-gradient(var(--pri) ${pct}%,var(--line) 0)"><div class="dashRingInner">${pct}<span>%</span></div></div>`+
+    `<div class="dashTiles">`+
+      `<div class="dashTile todo"><b>${pendingCount}</b><span>待辦中</span></div>`+
+      `<div class="dashTile mail"><b>${mailCount===null?'—':mailCount}</b><span>未讀信件</span></div>`+
+      `<div class="dashTile news"><b>${newsCount===null?'—':newsCount}</b><span>今日新聞</span></div>`+
+      `<div class="dashTile standup${standupOn?' on':''}"><b>${standupOn?'✅':'⭕'}</b><span>起立提醒</span></div>`+
+      buildSchoolTileHtml()+
+    `</div></div>`;
+}
+// 「校長助理」是同一個 origin（cyysongyy.github.io）底下的另一個 App，
+// 直接唯讀讀它存在 localStorage 的調課紀錄（不用網路請求），算出今日代課節數。
+// 使用者沒開過校長助理、localStorage 沒有這個 key 時就完全不顯示這格。
+function buildSchoolTileHtml(){
+  let raw;
+  try{raw=localStorage.getItem('pa_sub_records');}catch(e){return '';}
+  if(raw===null)return '';
+  let recs;
+  try{recs=JSON.parse(raw)||[];}catch(e){return '';}
+  const todayStr=new Date().toISOString().slice(0,10);
+  const todayCount=recs.filter(r=>r&&r.date===todayStr).length;
+  return `<div class="dashTile school"><b>${todayCount}</b><span>今日代課</span></div>`;
+}
 function renderOverview(){
   const box=document.getElementById('overviewCard');
   const c=state.context;
@@ -1056,9 +1170,10 @@ function renderOverview(){
   const todayStr=new Date().toDateString();
   const todayEvents=c?(c.calendar||[]).filter(ev=>new Date(ev.start).toDateString()===todayStr):[];
   renderHeroSchedule(todayEvents);
+  const dashHtml=buildDashStatsHtml(c);
   if(!c){
     box.style.display='block';
-    box.innerHTML=`<div class="section-title">☀️ 今日總覽</div><div class="ovItem ovEmpty">尚未連接雲端後台，請至「設定 → 雲端後台」連接後查看信件／新聞／起立提醒。</div>`;
+    box.innerHTML=`<div class="section-title">☀️ 今日總覽</div>${dashHtml}<div class="ovItem ovEmpty">尚未連接雲端後台，請至「設定 → 雲端後台」連接後查看信件／新聞／起立提醒。</div>`;
     return;
   }
 
@@ -1102,6 +1217,7 @@ function renderOverview(){
   const newsArrow=state.newsCollapsed?'▸':'▾';
   box.innerHTML=
     `<div class="section-title"><span class="ovLivePulse" title="資料即時更新"></span>☀️ 今日總覽</div>`+
+    dashHtml+
     `<div class="ovSection"><div class="ovLabel">📬 重要 Email</div>${mailHtml}</div>`+
     `<div class="ovSection"><div class="ovLabel ovLabelToggle" onclick="toggleNewsCollapse()">📰 今日新聞 <span class="ovToggleIcon">${newsArrow}</span></div>${state.newsCollapsed?'':newsHtml}</div>`+
     `<div class="ovSection">`+
@@ -1134,7 +1250,8 @@ function hourOptionsHtml(selected){
 
 // ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
 const NV_ENDPOINT='https://integrate.api.nvidia.com/v1/chat/completions';
-const NV_DEFAULT_MODEL='meta/llama-3.1-70b-instruct';
+// NVIDIA 模型目錄常會輪替／棄用，若又失效請至 build.nvidia.com/models 換一個目前可用的模型 id
+const NV_DEFAULT_MODEL='nvidia/llama-3.1-nemotron-70b-instruct';
 function aiOrder(){
   const p=state.ai.provider;
   const all=['gemini','openai','nvidia'].filter(id=>state.ai[id]);
@@ -1154,7 +1271,7 @@ async function callProvider(id,prompt,image){
   if(id==='gemini'){
     const parts=[{text:prompt}];
     if(image)parts.push({inline_data:{mime_type:image.mime||'image/jpeg',data:image.b64}});
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${state.ai.gemini}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.6,maxOutputTokens:1024}})});
     const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
@@ -1205,6 +1322,43 @@ function renderChat(){
   box.scrollTop=box.scrollHeight;
 }
 function quickAsk(text){document.getElementById('chatInput').value=text;sendChat();}
+// 校務管理系統（CK-SCHADMIN）是同一個 origin 下的另一個 App，直接唯讀讀取其
+// localStorage 快取（該 App 自己會把 Firebase 資料同步進 localStorage）。
+// 教職員資料依使用者指示全部帶入（含電話/地址/出生年月日等）；仍排除身分證
+// 字號與薪資兩項（查詢用途極低、外洩風險極高，即使個人使用也不划算），
+// 學生成績（cksch_grades）涉及未成年人資料，完全不讀取。
+function buildSchoolDbContext(){
+  const lines=[];
+  const read=k=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}};
+  const events=read('ck_events');
+  if(Array.isArray(events)&&events.length){
+    const today=new Date();today.setHours(0,0,0,0);
+    const until=new Date(today.getTime()+14*86400000);
+    const upcoming=events.filter(e=>{const d=new Date(e.date);return d>=today&&d<=until;})
+      .sort((a,b)=>a.date.localeCompare(b.date));
+    if(upcoming.length)lines.push('校務行事曆（近14天）：'+upcoming.map(e=>`${e.name}(${e.date}${e.type?'·'+e.type:''})`).join('；'));
+  }
+  const adminTasks=read('ck_admin');
+  if(Array.isArray(adminTasks)){
+    const pending=adminTasks.filter(t=>t.status!=='完成');
+    if(pending.length)lines.push('校務行政業務（未完成）：'+pending.slice(0,30).map(t=>`${t.name}(負責人${t.owner||'—'}·${t.status}${t.due?'·期限'+t.due:''})`).join('；'));
+  }
+  const trainings=read('ck_training');
+  if(Array.isArray(trainings)&&trainings.length){
+    const recent=trainings.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,15);
+    if(recent.length)lines.push('教師研習記錄（近期）：'+recent.map(t=>`${t.teacher}·${t.name}(${t.hours}小時${t.date?'·'+t.date:''})`).join('；'));
+  }
+  const staffList=read('ck_staff');
+  if(Array.isArray(staffList)&&staffList.length){
+    lines.push('教職員名冊（共'+staffList.length+'位，不含身分證字號/薪資）：'+
+      staffList.slice(0,60).map(s=>{
+        const parts=[s.unit,s.title,s.rank,s.phone?'電話'+s.phone:'',s.mobile?'手機'+s.mobile:'',
+          s.birth?'出生'+s.birth:'',s.startDate?'到職'+s.startDate:'',s.addr?'地址'+s.addr:'',s.note].filter(Boolean);
+        return `${s.name}(${parts.join('·')})`;
+      }).join('；'));
+  }
+  return lines.join('\n');
+}
 function buildContextText(){
   const lines=[];
   const pendingTodos=state.notes.filter(n=>n.type==='todo'&&!n.done);
@@ -1215,6 +1369,10 @@ function buildContextText(){
   if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,50).map(n=>n.content).join('；'));
   const knownLinks=state.links.filter(l=>l.name&&l.url);
   if(knownLinks.length)lines.push('使用者自建的其他 App：'+knownLinks.map(l=>`${l.name}(${l.url})`).join('；'));
+  if(state.useSchoolDb){
+    const schoolCtx=buildSchoolDbContext();
+    if(schoolCtx)lines.push(schoolCtx);
+  }
   const c=state.context;
   if(c){
     if(c.weather)lines.push(`今日天氣：${c.weather.city} ${c.weather.desc}，現在${c.weather.temp}°C，今日${c.weather.tMin}~${c.weather.tMax}°C，降雨機率${c.weather.rainChance??'—'}%`);
@@ -1290,7 +1448,7 @@ async function execChatActions(actions){
       }
     }catch(e){log.push(`⚠️ 執行失敗：${e.message}`);}
   }
-  if(log.length){save();renderNotes();}
+  if(log.length){save();renderNotes();renderOverview();}
   return log;
 }
 async function sendChat(){
