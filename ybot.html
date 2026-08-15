@@ -497,6 +497,15 @@ let state;
 function load(){try{state=Object.assign(defaults(),JSON.parse(localStorage.getItem(LS_KEY))||{});}catch(e){state=defaults();}}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
 load();
+// links 陣列存進 localStorage 後，defaults() 新增的預設連結（例如後來才加的
+// 校務管理系統）不會自動出現在已經有舊資料的使用者畫面上，這裡補一次性遷移。
+(function migrateDefaultLinks(){
+  let changed=false;
+  defaults().links.forEach(def=>{
+    if(!state.links.some(l=>l.id===def.id)){state.links.push(def);changed=true;}
+  });
+  if(changed)save();
+})();
 
 // ── 與同一個 cyysongyy.github.io origin 底下的其他 App（例如校長助理）共用 AI Key ──
 // 瀏覽器 localStorage 是以 origin 為單位隔離、不分路徑，兩個 App 雖然是不同 repo，
