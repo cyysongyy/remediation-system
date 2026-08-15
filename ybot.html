@@ -238,6 +238,8 @@ textarea.fi{resize:vertical;min-height:56px;}
 .dashTile.standup b{color:var(--tx2);}
 .dashTile.standup.on{background:rgba(5,150,105,.12);}
 .dashTile.standup.on b{color:var(--ok);}
+.dashTile.school{background:rgba(180,83,9,.12);}
+.dashTile.school b{color:#b45309;}
 
 .ovSection{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);}
 .ovSection:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
@@ -412,7 +414,7 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div class="field"><label>Gemini API Key</label><input id="geminiKey" class="fi" type="password" placeholder="AIzaSy… 或 AQ.…"></div>
       <div class="field"><label>OpenAI API Key</label><input id="openaiKey" class="fi" type="password" placeholder="sk-…"></div>
       <div class="field"><label>NVIDIA NIM API Key</label><input id="nvidiaKey" class="fi" type="password" placeholder="nvapi-…"></div>
-      <div class="hint">Key 僅存於你自己的瀏覽器，直接呼叫各家 API，不經第三方伺服器。免費取得：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a></div>
+      <div class="hint">Key 僅存於你自己的瀏覽器，直接呼叫各家 API，不經第三方伺服器。免費取得：<a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>。與「校長助理」共用同一個網域，貼過一次兩邊都能用。</div>
       <button class="btn" onclick="saveSettings(true)">儲存</button>
     </div>
 
@@ -484,6 +486,31 @@ let state;
 function load(){try{state=Object.assign(defaults(),JSON.parse(localStorage.getItem(LS_KEY))||{});}catch(e){state=defaults();}}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(state));}
 load();
+
+// ── 與同一個 cyysongyy.github.io origin 底下的其他 App（例如校長助理）共用 AI Key ──
+// 瀏覽器 localStorage 是以 origin 為單位隔離、不分路徑，兩個 App 雖然是不同 repo，
+// 部署後其實同一個 origin，本來就共用同一份 localStorage，只是各自用不同 key 存。
+// 這裡只補一份「共用」快照：貼過 key 的那個 App 存進去，另一個 App 沒填過的欄位
+// 就撿來用；已經自己填過的欄位不會被覆蓋，避免兩邊金鑰不同時互相打架。
+const SHARED_AI_KEY='shared_ai_keys_v1';
+function loadSharedAiKeys(){
+  try{return JSON.parse(localStorage.getItem(SHARED_AI_KEY))||{};}catch(e){return{};}
+}
+function hydrateSharedAiKeys(){
+  const shared=loadSharedAiKeys();
+  ['gemini','openai','nvidia'].forEach(k=>{
+    if(!state.ai[k]&&shared[k])state.ai[k]=shared[k];
+  });
+}
+function pushSharedAiKeys(){
+  const shared=loadSharedAiKeys();
+  ['gemini','openai','nvidia'].forEach(k=>{
+    if(state.ai[k])shared[k]=state.ai[k];
+  });
+  shared.updatedAt=new Date().toISOString();
+  localStorage.setItem(SHARED_AI_KEY,JSON.stringify(shared));
+}
+hydrateSharedAiKeys();
 
 // ── 主題 ────────────────────────────────
 function applyTheme(t){document.documentElement.setAttribute('data-theme',t);}
@@ -752,6 +779,7 @@ function saveSettings(showToast){
   state.ai.nvidia=document.getElementById('nvidiaKey').value.trim();
   state.gasUrl=document.getElementById('gasUrl').value.trim();
   save();
+  pushSharedAiKeys();
   if(showToast){const el=document.getElementById('connStatus');el.className='statusLine ok';el.textContent='✅ 已儲存';el.style.display='block';setTimeout(()=>el.style.display='none',1800);}
 }
 function saveLinked(){
@@ -1090,7 +1118,21 @@ function buildDashStatsHtml(c){
       `<div class="dashTile mail"><b>${mailCount===null?'—':mailCount}</b><span>未讀信件</span></div>`+
       `<div class="dashTile news"><b>${newsCount===null?'—':newsCount}</b><span>今日新聞</span></div>`+
       `<div class="dashTile standup${standupOn?' on':''}"><b>${standupOn?'✅':'⭕'}</b><span>起立提醒</span></div>`+
+      buildSchoolTileHtml()+
     `</div></div>`;
+}
+// 「校長助理」是同一個 origin（cyysongyy.github.io）底下的另一個 App，
+// 直接唯讀讀它存在 localStorage 的調課紀錄（不用網路請求），算出今日代課節數。
+// 使用者沒開過校長助理、localStorage 沒有這個 key 時就完全不顯示這格。
+function buildSchoolTileHtml(){
+  let raw;
+  try{raw=localStorage.getItem('pa_sub_records');}catch(e){return '';}
+  if(raw===null)return '';
+  let recs;
+  try{recs=JSON.parse(raw)||[];}catch(e){return '';}
+  const todayStr=new Date().toISOString().slice(0,10);
+  const todayCount=recs.filter(r=>r&&r.date===todayStr).length;
+  return `<div class="dashTile school"><b>${todayCount}</b><span>今日代課</span></div>`;
 }
 function renderOverview(){
   const box=document.getElementById('overviewCard');
