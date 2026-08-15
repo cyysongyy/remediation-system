@@ -451,6 +451,15 @@ textarea.fi{resize:vertical;min-height:56px;}
     </div>
 
     <div class="card">
+      <div class="section-title">🏫 校務管理系統（CK-SCHADMIN）</div>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:.86rem;cursor:pointer;">
+        <input type="checkbox" id="useSchoolDb" style="width:18px;height:18px;accent-color:var(--pri);" onchange="state.useSchoolDb=this.checked;save();">
+        對話時附上校務系統資料給 AI 參考
+      </label>
+      <div class="hint" style="margin-top:8px;">與校務系統同一個網域，直接唯讀讀取行事曆／行政業務／研習記錄／教職員基本資料（姓名·單位·職稱），不含身分證字號、電話、薪資、地址等隱私欄位，也不含學生成績。需先在同一瀏覽器打開過一次 <a href="https://cyysongyy.github.io/CK-SCHADMIN/" target="_blank" rel="noopener">校務管理系統</a>並登入，本機才會有快取資料。</div>
+    </div>
+
+    <div class="card">
       <div class="section-title">🔗 我的其他 App</div>
       <div class="hint" style="margin-bottom:10px;">你在 GitHub 上的其他自建 App，可在對話中快速開啟、也讓 Ybot 知道它們存在。若該 App 有自己的 Apps Script 後台網址，填入「後台網址」欄位，Ybot 每日簡報與對話會一併嘗試帶入其摘要（讀不到會自動略過）。</div>
       <div id="linkList"></div>
@@ -471,11 +480,13 @@ const LS_KEY='ybot_v1';
 function defaults(){return{
   theme:'',fontScale:1,newsCollapsed:false,standupCollapsed:true,
   ai:{provider:'auto',gemini:'',openai:'',nvidia:''},
+  useSchoolDb:false,
   gasUrl:'',remUrl:'',hltUrl:'',weatherCity:'',weatherLat:'',weatherLon:'',
   standup:{enabled:false,intervalMin:60,startHour:8,endHour:18},
   countdownMin:5,
   links:[
     {id:'principal-assistant',name:'Principal Assistant',url:'https://cyysongyy.github.io/principal-assistant/',apiUrl:''},
+    {id:'ck-schadmin',name:'校務管理系統',url:'https://cyysongyy.github.io/CK-SCHADMIN/',apiUrl:''},
     {id:'micro-politics',name:'Micro Politics',url:'https://cyysongyy.github.io/micro-politics/',apiUrl:''},
     {id:'footdrop-rehab',name:'垂足復健 5 步驟',url:'https://cyysongyy.github.io/5-steps-rehab-for-footdrop/',apiUrl:''}
   ],
@@ -558,6 +569,7 @@ function fillSettings(){
   document.getElementById('weatherCity').value=(state.weatherLat&&state.weatherLon)?`📍 目前位置（${state.weatherLat}, ${state.weatherLon}）`:state.weatherCity;
   document.getElementById('remUrl').value=state.remUrl;
   document.getElementById('hltUrl').value=state.hltUrl;
+  document.getElementById('useSchoolDb').checked=!!state.useSchoolDb;
   populateHourSelects();
   document.getElementById('standupEnabled').checked=!!state.standup.enabled;
   document.getElementById('standupInterval').value=state.standup.intervalMin;
@@ -1293,6 +1305,39 @@ function renderChat(){
   box.scrollTop=box.scrollHeight;
 }
 function quickAsk(text){document.getElementById('chatInput').value=text;sendChat();}
+// 校務管理系統（CK-SCHADMIN）是同一個 origin 下的另一個 App，直接唯讀讀取其
+// localStorage 快取（該 App 自己會把 Firebase 資料同步進 localStorage）。
+// 刻意排除敏感欄位：教職員的身分證字號／電話／薪資／地址／出生年月日，
+// 以及學生成績（cksch_grades，涉及未成年人資料，完全不讀取），
+// 避免把這些資料送進第三方 AI API。
+function buildSchoolDbContext(){
+  const lines=[];
+  const read=k=>{try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}};
+  const events=read('ck_events');
+  if(Array.isArray(events)&&events.length){
+    const today=new Date();today.setHours(0,0,0,0);
+    const until=new Date(today.getTime()+14*86400000);
+    const upcoming=events.filter(e=>{const d=new Date(e.date);return d>=today&&d<=until;})
+      .sort((a,b)=>a.date.localeCompare(b.date));
+    if(upcoming.length)lines.push('校務行事曆（近14天）：'+upcoming.map(e=>`${e.name}(${e.date}${e.type?'·'+e.type:''})`).join('；'));
+  }
+  const adminTasks=read('ck_admin');
+  if(Array.isArray(adminTasks)){
+    const pending=adminTasks.filter(t=>t.status!=='完成');
+    if(pending.length)lines.push('校務行政業務（未完成）：'+pending.slice(0,30).map(t=>`${t.name}(負責人${t.owner||'—'}·${t.status}${t.due?'·期限'+t.due:''})`).join('；'));
+  }
+  const trainings=read('ck_training');
+  if(Array.isArray(trainings)&&trainings.length){
+    const recent=trainings.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,15);
+    if(recent.length)lines.push('教師研習記錄（近期）：'+recent.map(t=>`${t.teacher}·${t.name}(${t.hours}小時${t.date?'·'+t.date:''})`).join('；'));
+  }
+  const staffList=read('ck_staff');
+  if(Array.isArray(staffList)&&staffList.length){
+    lines.push('教職員名冊（僅姓名/單位/職稱，共'+staffList.length+'位）：'+
+      staffList.slice(0,60).map(s=>`${s.name}(${s.unit||''}${s.title?'·'+s.title:''})`).join('；'));
+  }
+  return lines.join('\n');
+}
 function buildContextText(){
   const lines=[];
   const pendingTodos=state.notes.filter(n=>n.type==='todo'&&!n.done);
@@ -1303,6 +1348,10 @@ function buildContextText(){
   if(notesOnly.length)lines.push('瑣事筆記：'+notesOnly.slice(0,50).map(n=>n.content).join('；'));
   const knownLinks=state.links.filter(l=>l.name&&l.url);
   if(knownLinks.length)lines.push('使用者自建的其他 App：'+knownLinks.map(l=>`${l.name}(${l.url})`).join('；'));
+  if(state.useSchoolDb){
+    const schoolCtx=buildSchoolDbContext();
+    if(schoolCtx)lines.push(schoolCtx);
+  }
   const c=state.context;
   if(c){
     if(c.weather)lines.push(`今日天氣：${c.weather.city} ${c.weather.desc}，現在${c.weather.temp}°C，今日${c.weather.tMin}~${c.weather.tMax}°C，降雨機率${c.weather.rainChance??'—'}%`);
