@@ -60,7 +60,7 @@ function callAI(prompt) {
       const d = JSON.parse(res.getContentText());
       return d.choices && d.choices[0] ? d.choices[0].message.content : '';
     } else {
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=' + key;
       const res = UrlFetchApp.fetch(url, {
         method: 'post', contentType: 'application/json', muteHttpExceptions: true,
         payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })

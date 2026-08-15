@@ -876,7 +876,7 @@ function blobToBase64(blob){
 }
 async function transcribeWithGemini(blob,mime){
   const b64=await blobToBase64(blob);
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${state.ai.gemini}`,
     {method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({contents:[{parts:[
        {text:'請將這段語音逐字轉成繁體中文文字稿，只輸出文字稿內容本身，不要加任何說明、標題或引號。'},
@@ -1179,7 +1179,8 @@ function hourOptionsHtml(selected){
 
 // ── AI 呼叫（Gemini / OpenAI / NVIDIA，自動備援）──
 const NV_ENDPOINT='https://integrate.api.nvidia.com/v1/chat/completions';
-const NV_DEFAULT_MODEL='meta/llama-3.1-70b-instruct';
+// NVIDIA 模型目錄常會輪替／棄用，若又失效請至 build.nvidia.com/models 換一個目前可用的模型 id
+const NV_DEFAULT_MODEL='nvidia/llama-3.1-nemotron-70b-instruct';
 function aiOrder(){
   const p=state.ai.provider;
   const all=['gemini','openai','nvidia'].filter(id=>state.ai[id]);
@@ -1199,7 +1200,7 @@ async function callProvider(id,prompt,image){
   if(id==='gemini'){
     const parts=[{text:prompt}];
     if(image)parts.push({inline_data:{mime_type:image.mime||'image/jpeg',data:image.b64}});
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.ai.gemini}`,
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${state.ai.gemini}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
        body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:.6,maxOutputTokens:1024}})});
     const d=await r.json();if(!r.ok)throw new Error(d.error?.message||`Gemini ${r.status}`);
