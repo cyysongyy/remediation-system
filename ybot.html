@@ -39,7 +39,8 @@ body{font-family:'Microsoft JhengHei','Noto Sans TC',system-ui,sans-serif;backgr
 a{color:var(--pri);}
 button,input,textarea{font-family:inherit;}
 button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:8px;}
-.wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;}
+.wrap{max-width:760px;margin:0 auto;padding:16px 14px 60px;transition:max-width .2s;}
+@media(min-width:860px){.wrap{max-width:1080px;}}
 .hero{position:relative;overflow:hidden;border-radius:20px;padding:20px 20px 22px;margin-bottom:16px;
   background:radial-gradient(circle at 50% 30%,rgba(139,92,246,.30),transparent 60%),
              radial-gradient(circle at 6% 100%,rgba(76,29,149,.28),transparent 55%),
@@ -103,7 +104,20 @@ button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid va
 .tab.active{background:linear-gradient(135deg,var(--pri),var(--pri2));color:#fff;box-shadow:var(--shadow-pri);}
 .pane{display:none;}
 .pane.active{display:block;}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow-md);transition:box-shadow .2s,transform .2s;}
+
+/* 對話分頁：桌面/平板寬螢幕採 2×2 卡片網格排版，手機仍維持單欄堆疊 */
+@media(min-width:860px){
+  #pane-chat.active{display:grid;grid-template-columns:340px 1fr;grid-template-areas:"hero chat" "overview links";gap:18px;align-items:start;}
+  #pane-chat #heroCard{grid-area:hero;margin-bottom:0;}
+  #pane-chat #chatCard{grid-area:chat;margin-bottom:0;}
+  #pane-chat #chatCard #chatBox{max-height:min(56vh,460px);}
+  #pane-chat #overviewCard{grid-area:overview;margin-bottom:0;}
+  #pane-chat #linksCard{grid-area:links;margin-bottom:0;align-self:start;}
+}
+#linksCard .linkChips{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+#linksCard .linkChips a.chip{display:flex;align-items:center;gap:6px;justify-content:flex-start;
+  padding:11px 12px;border-radius:12px;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* Chat */
 #chatBox{display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow-y:auto;padding:4px 2px;
@@ -229,31 +243,6 @@ textarea.fi{resize:vertical;min-height:56px;}
 <button class="theme-btn" id="themeBtn" style="position:fixed;top:16px;right:16px;z-index:9;" onclick="toggleTheme()">🌓</button>
 
 <div class="wrap">
-  <div class="hero" id="heroCard">
-    <div class="heroDeco tl"></div>
-    <div class="heroDeco tr"></div>
-    <div class="heroTop">
-      <div class="heroWeatherMini" id="heroWeatherMini"></div>
-      <div class="heroClock" id="clockBox"></div>
-    </div>
-    <div class="heroBadgeRow">
-      <div class="heroOrbGroup">
-        <div class="heroOrbWrap">
-          <div class="heroOrbRing outer"></div>
-          <div class="heroOrbRing mid"></div>
-          <span class="heroOrbDot d1"></span>
-          <span class="heroOrbDot d2"></span>
-          <span class="heroOrbDot d3"></span>
-          <div class="heroOrbCore">Ybot</div>
-        </div>
-        <div class="heroOrbBeam"></div>
-        <div class="heroOrbBase"></div>
-      </div>
-      <div class="heroScheduleMini" id="heroScheduleMini"></div>
-    </div>
-    <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
-  </div>
-
   <div class="tabs">
     <div class="tab active" data-tab="chat" onclick="switchTab('chat')">💬 對話</div>
     <div class="tab" data-tab="notes" onclick="switchTab('notes')">📝 待辦與筆記</div>
@@ -262,13 +251,37 @@ textarea.fi{resize:vertical;min-height:56px;}
 
   <!-- 💬 對話 -->
   <div class="pane active" id="pane-chat">
+    <div class="hero" id="heroCard">
+      <div class="heroDeco tl"></div>
+      <div class="heroDeco tr"></div>
+      <div class="heroTop">
+        <div class="heroWeatherMini" id="heroWeatherMini"></div>
+        <div class="heroClock" id="clockBox"></div>
+      </div>
+      <div class="heroBadgeRow">
+        <div class="heroOrbGroup">
+          <div class="heroOrbWrap">
+            <div class="heroOrbRing outer"></div>
+            <div class="heroOrbRing mid"></div>
+            <span class="heroOrbDot d1"></span>
+            <span class="heroOrbDot d2"></span>
+            <span class="heroOrbDot d3"></span>
+            <div class="heroOrbCore">Ybot</div>
+          </div>
+          <div class="heroOrbBeam"></div>
+          <div class="heroOrbBase"></div>
+        </div>
+        <div class="heroScheduleMini" id="heroScheduleMini"></div>
+      </div>
+      <div class="heroSub">你的個人助理 · <a href="portal.html">← 回整合入口</a></div>
+    </div>
     <div class="card" id="overviewCard" style="display:none;"></div>
-    <div class="card">
+    <div class="card" id="chatCard">
+      <div class="section-title">💬 Ybot 對話</div>
       <div class="ctxbar">
         <span id="ctxStatus">尚未載入雲端資料</span>
         <button onclick="refreshContext()">🔄 重新整理資料</button>
       </div>
-      <div class="linkChips" id="linkChips"></div>
       <div id="chatBox"></div>
       <div id="chatImagePreview" style="display:none;"></div>
       <div class="inputRow">
@@ -277,6 +290,10 @@ textarea.fi{resize:vertical;min-height:56px;}
         <textarea id="chatInput" class="fi" placeholder="問 Ybot 任何事…（Enter 送出，Shift+Enter 換行）" style="margin-bottom:0;"></textarea>
         <button class="sendBtn" id="sendBtn" onclick="sendChat()">送出</button>
       </div>
+    </div>
+    <div class="card" id="linksCard" style="display:none;">
+      <div class="section-title">🔗 快速連結</div>
+      <div class="linkChips" id="linkChips"></div>
     </div>
   </div>
 
@@ -472,7 +489,6 @@ applyFontScale();
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));
-  document.getElementById('heroCard').style.display=name==='chat'?'':'none';
   if(name==='notes')renderNotes();
   if(name==='settings')fillSettings();
 }
@@ -755,9 +771,11 @@ function addLinkRow(){state.links.push({id:'app'+Date.now(),name:'',url:'',apiUr
 function removeLinkRow(i){state.links.splice(i,1);renderLinks();}
 function renderLinkChips(){
   const box=document.getElementById('linkChips');
+  const card=document.getElementById('linksCard');
   if(!box)return;
   const items=state.links.filter(l=>l.name&&l.url);
   box.innerHTML=items.map(l=>`<a class="chip" href="${esc(l.url)}" target="_blank" rel="noopener">🔗 ${esc(l.name)}</a>`).join('');
+  if(card)card.style.display=items.length?'':'none';
 }
 function saveLinksAll(){
   save();renderLinkChips();
