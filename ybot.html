@@ -303,7 +303,10 @@ textarea.fi{resize:vertical;min-height:56px;}
       <div class="section-title">💬 Ybot 對話</div>
       <div class="ctxbar">
         <span id="ctxStatus">尚未載入雲端資料</span>
-        <button onclick="refreshContext()">🔄 重新整理資料</button>
+        <span style="display:flex;gap:10px;flex-shrink:0;">
+          <button onclick="refreshContext()">🔄 重新整理資料</button>
+          <button onclick="clearChatOnly()">🗑️ 清除對話</button>
+        </span>
       </div>
       <div id="chatBox"></div>
       <div id="chatImagePreview" style="display:none;"></div>
@@ -856,6 +859,11 @@ function saveLinksAll(){
       body:JSON.stringify({action:'saveOtherLinks',links:state.links})}).catch(()=>{});
   }
   alert('已儲存');
+}
+function clearChatOnly(){
+  if(!state.chat.length)return;
+  if(!confirm('確定清除 Ybot 對話紀錄？（不影響待辦/筆記等其他資料）'))return;
+  state.chat=[];save();renderChat();
 }
 function clearLocal(){
   if(!confirm('確定清除本機的對話紀錄與筆記？（雲端資料不受影響）'))return;
