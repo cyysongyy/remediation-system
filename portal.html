@@ -8,6 +8,7 @@
 :root{
   --edu:#4f46e5;--edu2:#3730a3;
   --hlt:#0d9488;--hlt2:#0ea5e9;
+  --yb:#6d28d9;--yb2:#4c1d95;
   --pa:#b45309;--pa2:#78350f;
   --mp:#be123c;--mp2:#881337;
   --fd:#0369a1;--fd2:#0c4a6e;
@@ -38,6 +39,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .app::before{content:'';position:absolute;top:0;left:0;right:0;height:5px;}
 .app.edu::before{background:linear-gradient(90deg,var(--edu),var(--edu2));}
 .app.hlt::before{background:linear-gradient(90deg,var(--hlt),var(--hlt2));}
+.app.yb::before{background:linear-gradient(90deg,var(--yb),var(--yb2));}
 .app.pa::before{background:linear-gradient(90deg,var(--pa),var(--pa2));}
 .app.mp::before{background:linear-gradient(90deg,var(--mp),var(--mp2));}
 .app.fd::before{background:linear-gradient(90deg,var(--fd),var(--fd2));}
@@ -47,6 +49,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .tag{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-block;margin-bottom:12px;width:fit-content;}
 .app.edu .tag{background:rgba(79,70,229,.12);color:var(--edu);}
 .app.hlt .tag{background:rgba(13,148,136,.14);color:var(--hlt);}
+.app.yb .tag{background:rgba(109,40,217,.14);color:var(--yb);}
 .app.pa .tag{background:rgba(180,83,9,.14);color:var(--pa);}
 .app.mp .tag{background:rgba(190,18,60,.12);color:var(--mp);}
 .app.fd .tag{background:rgba(3,105,161,.12);color:var(--fd);}
@@ -61,6 +64,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
   border-radius:10px;color:#fff;width:fit-content;transition:opacity .15s;}
 .app.edu .cta{background:linear-gradient(135deg,var(--edu),var(--edu2));}
 .app.hlt .cta{background:linear-gradient(135deg,var(--hlt),var(--hlt2));}
+.app.yb .cta{background:linear-gradient(135deg,var(--yb),var(--yb2));}
 .app.pa .cta{background:linear-gradient(135deg,var(--pa),var(--pa2));}
 .app.mp .cta{background:linear-gradient(135deg,var(--mp),var(--mp2));}
 .app.fd .cta{background:linear-gradient(135deg,var(--fd),var(--fd2));}
@@ -108,6 +112,20 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
       <li>雲端後台 + 每週自動週報</li>
     </ul>
     <span class="cta">開啟系統 →</span>
+  </a>
+
+  <a class="app yb" href="https://cyysongyy.github.io/ybot/" target="_blank" rel="noopener">
+    <div class="icon">🤖</div>
+    <span class="tag">個人助理</span>
+    <h2>Ybot</h2>
+    <div class="desc">整合行程、Gmail、待辦瑣事與其他 App 的資料摘要，隨時問答、主動提醒，獨立部署於另一個 repo。</div>
+    <ul class="feat">
+      <li>日曆／Gmail 自動彙整</li>
+      <li>待辦優先分級與到點提醒</li>
+      <li>每日簡報、晚間彙整</li>
+      <li>可串接本專案其他 App 摘要</li>
+    </ul>
+    <span class="cta">開啟系統 ↗</span>
   </a>
 
   <a class="app pa" href="https://cyysongyy.github.io/principal-assistant/" target="_blank" rel="noopener">
