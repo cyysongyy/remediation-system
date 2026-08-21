@@ -12,6 +12,7 @@
   --mp:#be123c;--mp2:#881337;
   --fd:#0369a1;--fd2:#0c4a6e;
   --zn:#0f766e;--zn2:#134e4a;
+  --yb:#6d28d9;--yb2:#4c1d95;
   --yl:#7c3aed;--yl2:#4c1d95;
   --tx:#0f172a;--tx2:#475569;--tx3:#94a3b8;
   --bg:#f1f5f9;--card:#ffffff;--line:#e2e8f0;
@@ -43,6 +44,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .app.mp::before{background:linear-gradient(90deg,var(--mp),var(--mp2));}
 .app.fd::before{background:linear-gradient(90deg,var(--fd),var(--fd2));}
 .app.zn::before{background:linear-gradient(90deg,var(--zn),var(--zn2));}
+.app.yb::before{background:linear-gradient(90deg,var(--yb),var(--yb2));}
 .app.yl::before{background:linear-gradient(90deg,var(--yl),var(--yl2));}
 .icon{font-size:2.8rem;margin-bottom:12px;}
 .app h2{font-size:1.18rem;font-weight:800;margin-bottom:4px;}
@@ -53,6 +55,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .app.mp .tag{background:rgba(190,18,60,.12);color:var(--mp);}
 .app.fd .tag{background:rgba(3,105,161,.12);color:var(--fd);}
 .app.zn .tag{background:rgba(15,118,110,.12);color:var(--zn);}
+.app.yb .tag{background:rgba(109,40,217,.12);color:var(--yb);}
 .app.yl .tag{background:rgba(124,58,237,.12);color:var(--yl);}
 .desc{font-size:.86rem;color:var(--tx2);line-height:1.6;flex:1;}
 .feat{list-style:none;margin:14px 0 16px;padding:0;}
@@ -68,6 +71,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 .app.mp .cta{background:linear-gradient(135deg,var(--mp),var(--mp2));}
 .app.fd .cta{background:linear-gradient(135deg,var(--fd),var(--fd2));}
 .app.zn .cta{background:linear-gradient(135deg,var(--zn),var(--zn2));}
+.app.yb .cta{background:linear-gradient(135deg,var(--yb),var(--yb2));}
 .app.yl .cta{background:linear-gradient(135deg,var(--yl),var(--yl2));}
 .app:hover .cta{opacity:.9;}
 .foot{margin-top:34px;text-align:center;color:var(--tx3);font-size:.76rem;line-height:1.7;max-width:600px;}
@@ -82,7 +86,7 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
 <div class="hero">
   <div class="logo">🧭</div>
   <h1>Young 的智慧系統</h1>
-  <div class="sub">你的 App 工具箱，一個入口。教學批改、個人健康，加上校務、模擬、復健與身心練習工具，多為單一 HTML、資料存本機。</div>
+  <div class="sub">你的 App 工具箱，一個入口。教學批改、個人健康、個人助理，加上校務、模擬、復健與身心練習工具，多為單一 HTML、資料存本機。</div>
 </div>
 
 <div class="grid">
@@ -112,6 +116,14 @@ h1{font-size:1.5rem;font-weight:800;letter-spacing:.5px;}
       <li>雲端後台 + 每週自動週報</li>
     </ul>
     <span class="cta">開啟系統 →</span>
+  </a>
+
+  <a class="app yb" href="https://cyysongyy.github.io/Ybot/" target="_blank" rel="noopener">
+    <div class="icon">🤖</div>
+    <span class="tag">助理 · 每日總覽</span>
+    <h2>Ybot 個人助理</h2>
+    <div class="desc">行程、Gmail、待辦與其他 App 摘要一站問答，獨立部署於另一個 repo。</div>
+    <span class="cta">開啟系統 ↗</span>
   </a>
 
   <a class="app pa" href="https://cyysongyy.github.io/principal-assistant/" target="_blank" rel="noopener">
